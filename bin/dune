@@ -1,0 +1,5 @@
+(executable
+ (name main)
+ (public_name camlwm)
+ (package camlwm)
+ (libraries camlwm_core camlwm_xlib))

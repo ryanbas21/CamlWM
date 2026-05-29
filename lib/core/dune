@@ -1,0 +1,4 @@
+(library
+ (name camlwm_core)
+ (public_name camlwm.core)
+ (wrapped true))

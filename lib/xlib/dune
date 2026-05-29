@@ -1,0 +1,8 @@
+(library
+ (name camlwm_xlib)
+ (public_name camlwm.xlib)
+ (wrapped true)
+ (private_modules ffi)
+ (libraries ctypes ctypes-foreign)
+ (c_library_flags
+  (-lX11)))
