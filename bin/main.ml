@@ -1,7 +1,3 @@
-(* Allow unused values/opens while there are TODOs in this file.
-   Remove this once all three TODOs are filled in. *)
-[@@@warning "-32-33"]
-
 (* camlwm: tiling WM main entry point.
 
    This binary is the glue between the pure core and the X server:
@@ -72,20 +68,10 @@ let handle_event display (event : Event.t) (state : unit Stack_set.t) :
       let state' = Stack_set.insert_up window state in
       Display.map_window display window;
       state'
-  | Unmap_notify { window } ->
-      log "Unmap_notify: window=%d" window;
-      (* TODO #1: the window is going away. Remove it from [state] and
-       return the new state.
-       Hint: there's a function in [Stack_set] for this. No X call
-       needed — the unmap already happened. *)
-      let _ = window in
-      state
+  | Unmap_notify { window } -> Stack_set.delete window state
   | Destroy_notify { window } ->
       log "Destroy_notify: window=%d" window;
-      (* TODO #2: same idea as Unmap_notify. The window was destroyed
-       (closed) by the client. Remove it from [state]. *)
-      let _ = window in
-      state
+      Stack_set.delete window state
   | Configure_request { window; _ } ->
       (* A client asked to resize/move itself. Under tiling, geometry is
        the WM's call — the layout decides, not the client. So we just
@@ -132,7 +118,9 @@ let main () =
          - [screens]: a list with one element, [screen_detail].
        Wrap the result in a [ref] so we can mutate it in the loop. *)
       let state : unit Stack_set.t ref =
-        ref (failwith "TODO #3: build initial Stack_set")
+        ref
+        @@ Stack_set.empty ~layouts:() ~tags:initial_tags
+             ~screens:[ screen_detail ]
       in
 
       log "Entering event loop";
