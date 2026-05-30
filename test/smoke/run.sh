@@ -68,9 +68,20 @@ scenario_workspace_hide_show() {
     wait_for_visible_count xterm 1 2 || return 1
 }
 
+scenario_close_focused() {
+    # After scenario_workspace_hide_show, exactly one xterm is visible
+    # on ws 1 with focus. Mod4+Shift+c should kill it via XKillClient,
+    # which causes the X server to deliver DestroyNotify back to us
+    # so Stack_set.delete runs and the window is forgotten.
+    wait_for_visible_count xterm 1 3 || return 1
+    send_key super+q
+    wait_for_visible_count xterm 0 3 || return 1
+}
+
 SCENARIOS=(
     scenario_keypress_fires
     scenario_workspace_hide_show
+    scenario_close_focused
 )
 
 # ----------------------------------------------------------------------

@@ -32,16 +32,13 @@ let keysym_t : Unsigned.ulong typ = ulong
 
 (* Display *XOpenDisplay(const char *display_name);
    Pass NULL to use $DISPLAY. Returns NULL on failure. *)
-let x_open_display =
-  foreign "XOpenDisplay" (string_opt @-> returning display_t)
+let x_open_display = foreign "XOpenDisplay" (string_opt @-> returning display_t)
 
 (* int XCloseDisplay(Display *display); *)
-let x_close_display =
-  foreign "XCloseDisplay" (display_t @-> returning int)
+let x_close_display = foreign "XCloseDisplay" (display_t @-> returning int)
 
 (* int XDefaultScreen(Display *display); *)
-let x_default_screen =
-  foreign "XDefaultScreen" (display_t @-> returning int)
+let x_default_screen = foreign "XDefaultScreen" (display_t @-> returning int)
 
 (* Window XRootWindow(Display *display, int screen_number); *)
 let x_root_window =
@@ -59,17 +56,16 @@ let x_select_input =
   foreign "XSelectInput" (display_t @-> window_t @-> long @-> returning int)
 
 (* int XSync(Display *display, Bool discard); *)
-let x_sync =
-  foreign "XSync" (display_t @-> bool @-> returning int)
+let x_sync = foreign "XSync" (display_t @-> bool @-> returning int)
 
 (* int XPending(Display *display); *)
-let x_pending =
-  foreign "XPending" (display_t @-> returning int)
+let x_pending = foreign "XPending" (display_t @-> returning int)
 
 (* int XNextEvent(Display *display, XEvent *event_return);
    XEvent is a ~192-byte union. We pass a raw buffer and interpret the
    first 4 bytes as the [type] field. *)
 let xevent_buf_size = 192
+
 let x_next_event =
   foreign "XNextEvent" (display_t @-> ptr char @-> returning int)
 
@@ -87,9 +83,10 @@ let x_unmap_window =
                           unsigned int width, unsigned int height); *)
 let x_move_resize_window =
   foreign "XMoveResizeWindow"
-    (display_t @-> window_t @-> int @-> int @-> uint @-> uint
-     @-> returning int)
+    (display_t @-> window_t @-> int @-> int @-> uint @-> uint @-> returning int)
 
+let x_kill_client =
+  foreign "XKillClient" (display_t @-> window_t @-> returning int)
 (* ---------- Keyboard ---------- *)
 
 (* KeyCode XKeysymToKeycode(Display *display, KeySym keysym); *)
@@ -106,15 +103,14 @@ let x_string_to_keysym =
 let x_grab_key =
   foreign "XGrabKey"
     (display_t @-> int @-> uint @-> window_t @-> bool @-> int @-> int
-     @-> returning int)
+   @-> returning int)
 
 (* ---------- Error handler ---------- *)
 
 (* int (*XErrorHandler)(Display *, XErrorEvent *) — set via
    XSetErrorHandler. We need ctypes-foreign's [funptr] to convert an
    OCaml callback into a C function pointer. *)
-let error_handler_t =
-  Foreign.funptr (display_t @-> ptr char @-> returning int)
+let error_handler_t = Foreign.funptr (display_t @-> ptr char @-> returning int)
 
 let x_set_error_handler =
   foreign "XSetErrorHandler" (error_handler_t @-> returning error_handler_t)
@@ -123,51 +119,51 @@ let x_set_error_handler =
 (* Values from X.h. These are part of the X11 ABI and effectively frozen. *)
 
 module Event_mask = struct
-  let no_event           = 0L
-  let key_press          = 0x00000001L
-  let key_release        = 0x00000002L
-  let button_press       = 0x00000004L
-  let enter_window       = 0x00000010L
-  let leave_window       = 0x00000020L
-  let pointer_motion     = 0x00000040L
-  let exposure           = 0x00008000L
-  let structure_notify   = 0x00020000L
-  let substructure_notify   = 0x00080000L
+  let no_event = 0L
+  let key_press = 0x00000001L
+  let key_release = 0x00000002L
+  let button_press = 0x00000004L
+  let enter_window = 0x00000010L
+  let leave_window = 0x00000020L
+  let pointer_motion = 0x00000040L
+  let exposure = 0x00008000L
+  let structure_notify = 0x00020000L
+  let substructure_notify = 0x00080000L
   let substructure_redirect = 0x00100000L
-  let focus_change       = 0x00200000L
-  let property_change    = 0x00400000L
+  let focus_change = 0x00200000L
+  let property_change = 0x00400000L
 end
 
 module Event_type = struct
-  let key_press         = 2
-  let key_release       = 3
-  let button_press      = 4
-  let button_release    = 5
-  let motion_notify     = 6
-  let enter_notify      = 7
-  let leave_notify      = 8
-  let focus_in          = 9
-  let focus_out         = 10
-  let destroy_notify    = 17
-  let unmap_notify      = 18
-  let map_notify        = 19
-  let map_request       = 20
-  let reparent_notify   = 21
-  let configure_notify  = 22
+  let key_press = 2
+  let key_release = 3
+  let button_press = 4
+  let button_release = 5
+  let motion_notify = 6
+  let enter_notify = 7
+  let leave_notify = 8
+  let focus_in = 9
+  let focus_out = 10
+  let destroy_notify = 17
+  let unmap_notify = 18
+  let map_notify = 19
+  let map_request = 20
+  let reparent_notify = 21
+  let configure_notify = 22
   let configure_request = 23
-  let property_notify   = 28
-  let client_message    = 33
+  let property_notify = 28
+  let client_message = 33
 end
 
 module Modifier = struct
-  let shift   = 0x01
+  let shift = 0x01
   let control = 0x04
-  let mod1    = 0x08  (* Alt on most layouts *)
-  let mod4    = 0x40  (* Super / Windows key *)
+  let mod1 = 0x08 (* Alt on most layouts *)
+  let mod4 = 0x40 (* Super / Windows key *)
 end
 
 module Grab_mode = struct
-  let sync  = 0
+  let sync = 0
   let async = 1
 end
 
@@ -176,7 +172,8 @@ end
    fields to dispatch on event type and pull window IDs out. For full
    field access we'll add typed views later. *)
 
-let xevent_offset_type = 0          (* int type (4 bytes) *)
+let xevent_offset_type = 0
+(* int type (4 bytes) *)
 (* For XMapRequestEvent, XUnmapEvent, XConfigureRequestEvent, ...,
    the [window] field lives at offset 32 on 64-bit Linux:
      unsigned long serial;  // 8

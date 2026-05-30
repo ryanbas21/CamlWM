@@ -1,6 +1,11 @@
 open Camlwm_core
 open Camlwm_xlib
 
+let lock_combos =
+  [
+    0; (* no lock *) 0x02; (* caps lock *) 0x10; (*  Numlock *) 0x12; (*  both *)
+  ]
+
 let workspace_bindings =
   List.concat_map
     (fun tag ->
@@ -32,6 +37,11 @@ let bindings : Key_binding.t list =
       key = "space";
       action = Swap_master;
     };
+    {
+      Key_binding.modifiers = Key_binding.mod4;
+      key = "q";
+      action = Close_focused;
+    };
   ]
   @ workspace_bindings
 
@@ -62,7 +72,7 @@ let reconcile_visibility display state =
       Display.unmap_window display x)
     hidden
 
-let run_action _display action state =
+let run_action display action state =
   match action with
   | Key_binding.Focus_next -> Stack_set.focus_down state
   | Key_binding.Focus_prev -> Stack_set.focus_up state
@@ -73,7 +83,12 @@ let run_action _display action state =
           try Unix.execvp (List.hd cmd) (Array.of_list cmd) with _ -> exit 127)
       | _ -> ());
       state
-  | Key_binding.Close_focused -> state
+  | Key_binding.Close_focused -> (
+      match Stack_set.peek state with
+      | None -> state
+      | Some w ->
+          Display.kill_client display w;
+          state)
   | Key_binding.Shift tag -> Stack_set.shift tag state
   | Key_binding.View tag -> Stack_set.view tag state
 
@@ -188,8 +203,11 @@ let main () =
         (fun (binding : Key_binding.t) ->
           let keysym = Display.keysym_of_string binding.key in
           let keycode = Display.keycode_of_keysym display ~keysym in
-          Display.grab_key display ~window:root ~keycode
-            ~modifiers:binding.modifiers)
+          List.iter
+            (fun lock ->
+              Display.grab_key display ~window:root ~keycode
+                ~modifiers:(binding.modifiers lor lock))
+            lock_combos)
         bindings;
 
       let state : unit Stack_set.t ref =
