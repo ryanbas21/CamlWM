@@ -83,3 +83,34 @@ wait_for_log() {
 send_key() {
     DISPLAY="$SMOKE_DISPLAY" xdotool key "$1"
 }
+
+# Count visible (mapped) windows matching an X11 class.
+# Usage: count_visible_class xterm
+count_visible_class() {
+    local cls="$1"
+    DISPLAY="$SMOKE_DISPLAY" xdotool search --onlyvisible --class "$cls" \
+        2>/dev/null | wc -l
+}
+
+# Block until [count_visible_class CLS] equals EXPECTED, up to TIMEOUT seconds.
+# Usage: wait_for_visible_count xterm 1
+wait_for_visible_count() {
+    local cls="$1"
+    local expected="$2"
+    local timeout="${3:-3}"
+    local i=0
+    local max=$((timeout * 20))
+    local actual
+    while true; do
+        actual=$(count_visible_class "$cls")
+        if [[ "$actual" == "$expected" ]]; then
+            return 0
+        fi
+        sleep 0.05
+        i=$((i + 1))
+        if [[ $i -ge $max ]]; then
+            echo "smoke: timeout — expected $expected visible '$cls', have $actual"
+            return 1
+        fi
+    done
+}

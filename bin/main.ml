@@ -1,17 +1,66 @@
 open Camlwm_core
 open Camlwm_xlib
 
+let workspace_bindings =
+  List.concat_map
+    (fun tag ->
+      [
+        {
+          Key_binding.modifiers = Key_binding.mod4;
+          key = tag;
+          action = View tag;
+        };
+        {
+          Key_binding.modifiers = Key_binding.mod4 lor Key_binding.shift;
+          key = tag;
+          action = Shift tag;
+        };
+      ])
+    [ "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9" ]
+
 let bindings : Key_binding.t list =
   [
     {
-      modifiers = Key_binding.mod4;
+      Key_binding.modifiers = Key_binding.mod4;
       key = "Return";
       action = Spawn [ "xterm"; "-fa"; "Monospace"; "-fs"; "12" ];
     };
-    { modifiers = Key_binding.mod4; key = "j"; action = Focus_next };
-    { modifiers = Key_binding.mod4; key = "k"; action = Focus_prev };
-    { modifiers = Key_binding.mod4; key = "space"; action = Swap_master };
+    { Key_binding.modifiers = Key_binding.mod4; key = "j"; action = Focus_next };
+    { Key_binding.modifiers = Key_binding.mod4; key = "k"; action = Focus_prev };
+    {
+      Key_binding.modifiers = Key_binding.mod4;
+      key = "space";
+      action = Swap_master;
+    };
   ]
+  @ workspace_bindings
+
+let pending_unmaps : (Event.window, int) Hashtbl.t = Hashtbl.create 16
+
+let note_pending_unmaps w =
+  let cur = try Hashtbl.find pending_unmaps w with Not_found -> 0 in
+  Hashtbl.replace pending_unmaps w (cur + 1)
+
+let consume_pending_unmap w =
+  match Hashtbl.find_opt pending_unmaps w with
+  | Some n when n > 1 ->
+      Hashtbl.replace pending_unmaps w (n - 1);
+      true
+  | Some _ ->
+      Hashtbl.remove pending_unmaps w;
+      true
+  | None -> false
+
+let reconcile_visibility display state =
+  let visible = Stack_set.index state in
+  let all = Stack_set.all_windows state in
+  let hidden = List.filter (fun w -> not (List.mem w visible)) all in
+  List.iter (Display.map_window display) visible;
+  List.iter
+    (fun x ->
+      note_pending_unmaps x;
+      Display.unmap_window display x)
+    hidden
 
 let run_action _display action state =
   match action with
@@ -25,6 +74,8 @@ let run_action _display action state =
       | _ -> ());
       state
   | Key_binding.Close_focused -> state
+  | Key_binding.Shift tag -> Stack_set.shift tag state
+  | Key_binding.View tag -> Stack_set.view tag state
 
 (* ----------------------------------------------------------------- *)
 (* Configuration (hardcoded for Phase 1)                              *)
@@ -35,7 +86,13 @@ let screen_detail : Stack_set.screen_detail =
   { sx = 0; sy = 0; sw = 1024; sh = 768 }
 
 let initial_tags = [ "1"; "2"; "3"; "4"; "5" ]
-let log fmt = Format.kasprintf print_endline fmt
+
+let log fmt =
+  Format.kasprintf
+    (fun x ->
+      print_endline x;
+      flush stdout)
+    fmt
 
 (* ----------------------------------------------------------------- *)
 (* Layout application                                                 *)
@@ -72,7 +129,9 @@ let handle_event display (event : Event.t) (state : unit Stack_set.t) :
       let state' = Stack_set.insert_up window state in
       Display.map_window display window;
       state'
-  | Unmap_notify { window } -> Stack_set.delete window state
+  | Unmap_notify { window } ->
+      if consume_pending_unmap window then state
+      else Stack_set.delete window state
   | Destroy_notify { window } ->
       log "Destroy_notify: window=%d" window;
       Stack_set.delete window state
@@ -143,6 +202,7 @@ let main () =
       let rec loop () =
         let event = Display.next_event display in
         state := handle_event display event !state;
+        reconcile_visibility display !state;
         apply_layout display !state;
         loop ()
       in

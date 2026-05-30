@@ -5,6 +5,8 @@ type action =
   | Focus_prev (* Stack_set.focus_up *)
   | Close_focused (* tell X to close the focused window *)
   | Swap_master (* Stack_set.swap_master *)
+  | View of Stack_set.workspace_tag
+  | Shift of Stack_set.workspace_tag (*Mod4 +Shift1..9*)
 
 type t = { modifiers : int; key : string; action : action }
 

@@ -44,8 +44,33 @@ scenario_keypress_fires() {
     wait_for_log "Key_press: keycode=" 2
 }
 
+scenario_workspace_hide_show() {
+    # End-to-end test of workspace switching. Reuses the xterm that
+    # scenario_keypress_fires spawned (super+Return). Switch to ws 2
+    # (xterm should be unmapped), switch back to ws 1 (xterm should
+    # reappear). The "reappear" assertion is the real value — it
+    # proves the pending-unmaps counter prevented our own UnmapNotify
+    # echoes from evicting the window from Stack_set.
+    #
+    # We deliberately do NOT pkill xterm here: killing the focused
+    # window mid-test confuses xdotool's key delivery and the next
+    # super+ press silently no-ops.
+
+    # Wait for scenario 1's xterm to finish mapping.
+    wait_for_visible_count xterm 1 5 || return 1
+
+    # Switch to ws 2 — xterm should be hidden.
+    send_key super+2
+    wait_for_visible_count xterm 0 2 || return 1
+
+    # Switch back to ws 1 — xterm should reappear (THIS is the bug fix).
+    send_key super+1
+    wait_for_visible_count xterm 1 2 || return 1
+}
+
 SCENARIOS=(
     scenario_keypress_fires
+    scenario_workspace_hide_show
 )
 
 # ----------------------------------------------------------------------
