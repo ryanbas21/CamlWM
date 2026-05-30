@@ -28,6 +28,14 @@ let window_t : Unsigned.ulong typ = ulong
 let keycode_t : Unsigned.uchar typ = uchar
 let keysym_t : Unsigned.ulong typ = ulong
 
+(* ---------- Display Indication   ---------- *)
+let x_set_window_border =
+  foreign "XSetWindowBorder" (display_t @-> window_t @-> ulong @-> returning int)
+
+let x_set_window_border_width =
+  foreign "XSetWindowBorderWidth"
+    (display_t @-> window_t @-> uint @-> returning int)
+
 (* ---------- Display open / close ---------- *)
 
 (* Display *XOpenDisplay(const char *display_name);

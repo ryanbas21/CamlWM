@@ -69,3 +69,9 @@ val install_error_handler : on_error:(event_type:int -> unit) -> unit
 (** Installs a process-wide X error handler. Called for non-fatal X protocol
     errors (e.g. operating on a window that was just destroyed). Without this,
     libX11's default handler prints to stderr and aborts. *)
+
+val set_border_width : t -> window -> int -> unit
+
+val set_border_color : t -> window -> int -> unit
+(** [color] is a raw pixel value. On TrueColor visuals (universal on modern X),
+    it's packed 0xRRGGBB. *)

@@ -1,6 +1,9 @@
 let () =
   Alcotest.run "camlwm"
     [
-      ("Stack_set", Test_stack_set.suite);
-      ("Tall",      Test_tall.suite);
+      "Stack_set", Test_stack_set.suite;
+      "Layout",    Test_layout.suite;
+      "Tall",      Test_tall.suite;
+      "Wide",      Test_wide.suite;
+      "Full",      Test_full.suite;
     ]

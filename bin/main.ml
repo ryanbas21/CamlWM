@@ -1,10 +1,16 @@
 open Camlwm_core
 open Camlwm_xlib
 
+let border_width = 2
+let focused_color = 0x4078F2 (* Blue *)
+let unfocused_color = 0x444444 (* Dark gray *)
+
 let lock_combos =
   [
     0; (* no lock *) 0x02; (* caps lock *) 0x10; (*  Numlock *) 0x12; (*  both *)
   ]
+
+let gap = 4
 
 let workspace_bindings =
   List.concat_map
@@ -85,8 +91,8 @@ let layouts : Layout.t list = [ Tall.layout; Wide.layout; Full.layout ]
    Compares by name so two records with the same name count as equal. *)
 let next_layout (current : Layout.t) : Layout.t =
   let rec advance = function
-    | [] -> current                                  (* not found — keep current *)
-    | [ _ ] -> List.hd layouts                       (* current is last — wrap *)
+    | [] -> current (* not found — keep current *)
+    | [ _ ] -> List.hd layouts (* current is last — wrap *)
     | x :: y :: _ when x.Layout.name = current.name -> y
     | _ :: rest -> advance rest
   in
@@ -97,8 +103,7 @@ let run_action display action state =
   | Key_binding.Focus_next -> Stack_set.focus_down state
   | Key_binding.Focus_prev -> Stack_set.focus_up state
   | Key_binding.Swap_master -> Stack_set.swap_master state
-  | Key_binding.Cycle_layout ->
-      Stack_set.modify_layout next_layout state
+  | Key_binding.Cycle_layout -> Stack_set.modify_layout next_layout state
   | Key_binding.Spawn cmd ->
       (match Unix.fork () with
       | 0 -> (
@@ -134,6 +139,22 @@ let log fmt =
 (* ----------------------------------------------------------------- *)
 (* Layout application                                                 *)
 
+let apply_gap (r : Geometry.rect) : Geometry.rect =
+  {
+    x = r.x + gap;
+    y = r.y + gap;
+    w = max 1 (r.w - (2 * gap) - (2 * border_width));
+    h = max 1 (r.h - (2 * gap) - (2 * border_width));
+  }
+
+let update_borders display state =
+  let focused = Stack_set.peek state in
+  List.iter
+    (fun w ->
+      let color = if Some w = focused then focused_color else unfocused_color in
+      Display.set_border_color display w color)
+    (Stack_set.all_windows state)
+
 (* Re-tile every visible window on the current workspace according to
    the active layout (currently always Tall). *)
 let apply_layout display (state : Layout.t Stack_set.t) =
@@ -142,8 +163,8 @@ let apply_layout display (state : Layout.t Stack_set.t) =
   let rects = layout.do_layout ~screen:screen_detail windows in
   List.iter
     (fun (window, (rect : Geometry.rect)) ->
-      Display.move_resize display ~window ~x:rect.x ~y:rect.y ~w:rect.w
-        ~h:rect.h)
+      let r = apply_gap rect in
+      Display.move_resize display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h)
     rects
 
 (* ----------------------------------------------------------------- *)
@@ -165,6 +186,7 @@ let handle_event display (event : Event.t) (state : Layout.t Stack_set.t) :
           contract: the server defers the map to us.) *)
       log "Map_request: window=%d" window;
       let state' = Stack_set.insert_up window state in
+      Display.set_border_width display window border_width;
       Display.map_window display window;
       state'
   | Unmap_notify { window } ->
@@ -245,6 +267,7 @@ let main () =
         state := handle_event display event !state;
         reconcile_visibility display !state;
         apply_layout display !state;
+        update_borders display !state;
         loop ()
       in
       loop ()

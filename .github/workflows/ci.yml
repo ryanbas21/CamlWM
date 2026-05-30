@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel older runs from the same branch when a new commit arrives.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: build + unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          extra-conf: |
+            experimental-features = nix-command flakes
+
+      - name: Set up Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Show toolchain versions
+        run: |
+          nix develop --command bash -c '
+            echo "ocaml: $(ocaml -version 2>&1 | head -1)"
+            echo "dune:  $(dune --version)"
+            echo "ocamlfind packages relevant to build:"
+            ocamlfind list | grep -E "^(ctypes|alcotest)" || true
+          '
+
+      - name: Build
+        run: nix develop --command dune build
+
+      - name: Unit tests
+        run: nix develop --command dune runtest
+
+  # Smoke tests intentionally not in CI — they spawn Xephyr + drive an
+  # xdotool synthetic-input loop. Doable headlessly via Xvfb but the
+  # harness was designed around Xephyr and the win isn't worth the
+  # added flakiness today. Run them locally:  bash test/smoke/run.sh

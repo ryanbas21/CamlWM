@@ -1,0 +1,72 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dune: build",
+      "type": "shell",
+      "command": "dune",
+      "args": ["build"],
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "dune: build (watch)",
+      "type": "shell",
+      "command": "dune",
+      "args": ["build", "--watch"],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "dune: runtest",
+      "type": "shell",
+      "command": "dune",
+      "args": ["runtest"],
+      "group": { "kind": "test", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "dune: runtest (watch)",
+      "type": "shell",
+      "command": "dune",
+      "args": ["runtest", "--watch"],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "smoke: run all scenarios",
+      "type": "shell",
+      "command": "bash",
+      "args": ["test/smoke/run.sh"],
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "smoke: run with verbose log",
+      "type": "shell",
+      "command": "bash",
+      "args": ["test/smoke/run.sh"],
+      "options": { "env": { "SMOKE_VERBOSE": "1" } },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "dune: clean",
+      "type": "shell",
+      "command": "dune",
+      "args": ["clean"],
+      "presentation": { "reveal": "silent", "panel": "shared" }
+    },
+    {
+      "label": "camlwm: run in Xephyr :10",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "pkill -f 'Xephyr :10' 2>/dev/null; rm -f /tmp/.X10-lock /tmp/.X11-unix/X10; Xephyr :10 -screen 1024x768 & sleep 0.3 && DISPLAY=:10 dune exec camlwm"
+      ],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ]
+}

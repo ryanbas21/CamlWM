@@ -80,3 +80,13 @@ let install_error_handler ~on_error =
   _error_handler_keepalive := Some handler;
   let _prev = Ffi.x_set_error_handler handler in
   ()
+
+let set_border_width t w width =
+  ignore
+    (Ffi.x_set_window_border_width t.raw (Unsigned.ULong.of_int w)
+       (Unsigned.UInt.of_int width))
+
+let set_border_color t w color =
+  ignore
+    (Ffi.x_set_window_border_width t.raw (Unsigned.ULong.of_int w)
+       (Unsigned.UInt.of_int color))
