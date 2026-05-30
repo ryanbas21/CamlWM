@@ -1,3 +1,11 @@
+(*****
+     +-----------------+
+     |     master      |
+     +------+-----+----+
+     |  s1  | s2  | s3 |
+     +------+-----+----+
+
+   *****)
 open Stack_set
 open Geometry
 
@@ -14,21 +22,21 @@ let do_layout ~screen:(screen_detail : screen_detail) (windows : window list) :
         {
           x = screen_detail.sx;
           y = screen_detail.sy;
-          w = screen_detail.sw / 2;
-          h = screen_detail.sh;
+          w = screen_detail.sw;
+          h = screen_detail.sh / 2;
         }
       in
-      let slave_h = screen_detail.sh / total in
+      let slave_w = screen_detail.sw / total in
       [ (master, master_rect) ]
       @ List.mapi
           (fun i slave ->
             ( slave,
               {
-                x = screen_detail.sx + (screen_detail.sw / 2);
-                y = i * slave_h;
-                w = screen_detail.sw / 2;
-                h = slave_h;
+                x = screen_detail.sx + (i * slave_w);
+                y = screen_detail.sy + (screen_detail.sh / 2);
+                w = slave_w;
+                h = screen_detail.sh / 2;
               } ))
           slaves
 
-let layout : Layout.t = { name = "tall"; do_layout }
+let layout : Layout.t = { name = "wide"; do_layout }

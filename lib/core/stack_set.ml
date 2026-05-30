@@ -220,6 +220,9 @@ let swap_up t = map_current_workspace (map_stack swap_up_stack) t
 let swap_down t = map_current_workspace (map_stack swap_down_stack) t
 let swap_master t = map_current_workspace (map_stack swap_master_stack) t
 
+let modify_layout f t =
+  map_current_workspace (fun ws -> { ws with layout = f ws.layout }) t
+
 let insert_up w t =
   if member w t then t
   else

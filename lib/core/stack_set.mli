@@ -124,3 +124,7 @@ val shift : workspace_tag -> 'l t -> 'l t
 (** Move the focused window to workspace [tag]. *)
 
 val all_windows : 'l t -> window list
+
+val modify_layout : ('l -> 'l) -> 'l t -> 'l t
+(** Apply [f] to the layout of the current workspace. Other workspaces
+    keep whatever layout they had. *)

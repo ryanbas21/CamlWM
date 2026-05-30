@@ -7,6 +7,7 @@ type action =
   | Swap_master (* Stack_set.swap_master *)
   | View of Stack_set.workspace_tag (* workspaces *)
   | Shift of Stack_set.workspace_tag (*Mod4 +Shift1..9 *)
+  | Cycle_layout
 
 type t = { modifiers : int; key : string; action : action }
 

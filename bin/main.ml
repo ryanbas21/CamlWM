@@ -35,6 +35,11 @@ let bindings : Key_binding.t list =
     {
       Key_binding.modifiers = Key_binding.mod4;
       key = "space";
+      action = Cycle_layout;
+    };
+    {
+      Key_binding.modifiers = Key_binding.mod4;
+      key = "m";
       action = Swap_master;
     };
     {
@@ -72,11 +77,28 @@ let reconcile_visibility display state =
       Display.unmap_window display x)
     hidden
 
+(* Layouts available to cycle through, in order. Mod4+Space advances
+   through this list, wrapping back to the head after the last. *)
+let layouts : Layout.t list = [ Tall.layout; Wide.layout; Full.layout ]
+
+(* Given the current layout, return the next one in [layouts] (wrap).
+   Compares by name so two records with the same name count as equal. *)
+let next_layout (current : Layout.t) : Layout.t =
+  let rec advance = function
+    | [] -> current                                  (* not found — keep current *)
+    | [ _ ] -> List.hd layouts                       (* current is last — wrap *)
+    | x :: y :: _ when x.Layout.name = current.name -> y
+    | _ :: rest -> advance rest
+  in
+  advance layouts
+
 let run_action display action state =
   match action with
   | Key_binding.Focus_next -> Stack_set.focus_down state
   | Key_binding.Focus_prev -> Stack_set.focus_up state
   | Key_binding.Swap_master -> Stack_set.swap_master state
+  | Key_binding.Cycle_layout ->
+      Stack_set.modify_layout next_layout state
   | Key_binding.Spawn cmd ->
       (match Unix.fork () with
       | 0 -> (
@@ -114,9 +136,10 @@ let log fmt =
 
 (* Re-tile every visible window on the current workspace according to
    the active layout (currently always Tall). *)
-let apply_layout display (state : unit Stack_set.t) =
+let apply_layout display (state : Layout.t Stack_set.t) =
   let windows = Stack_set.index state in
-  let rects = Tall.do_layout ~screen:screen_detail windows in
+  let layout = state.current.workspace.layout in
+  let rects = layout.do_layout ~screen:screen_detail windows in
   List.iter
     (fun (window, (rect : Geometry.rect)) ->
       Display.move_resize display ~window ~x:rect.x ~y:rect.y ~w:rect.w
@@ -130,8 +153,8 @@ let apply_layout display (state : unit Stack_set.t) =
    the layout afterwards, so handlers only need to update Stack_set
    and call any *required* X side effects (like actually mapping a
    freshly-requested window). *)
-let handle_event display (event : Event.t) (state : unit Stack_set.t) :
-    unit Stack_set.t =
+let handle_event display (event : Event.t) (state : Layout.t Stack_set.t) :
+    Layout.t Stack_set.t =
   match event with
   (* WORKED EXAMPLE — use this pattern for the two TODOs below. *)
   | Map_request { window } ->
@@ -210,9 +233,9 @@ let main () =
             lock_combos)
         bindings;
 
-      let state : unit Stack_set.t ref =
+      let state =
         ref
-        @@ Stack_set.empty ~layouts:() ~tags:initial_tags
+        @@ Stack_set.empty ~layouts:Tall.layout ~tags:initial_tags
              ~screens:[ screen_detail ]
       in
 

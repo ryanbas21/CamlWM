@@ -92,6 +92,18 @@ count_visible_class() {
         2>/dev/null | wc -l
 }
 
+# Width of the first visible window matching CLASS (0 if none).
+# Usage: width=$(first_visible_width xterm)
+first_visible_width() {
+    local cls="$1"
+    local wid
+    wid=$(DISPLAY="$SMOKE_DISPLAY" xdotool search --onlyvisible --class "$cls" \
+            2>/dev/null | head -1)
+    [[ -z "$wid" ]] && { echo 0; return; }
+    DISPLAY="$SMOKE_DISPLAY" xdotool getwindowgeometry --shell "$wid" 2>/dev/null \
+        | awk -F= '/^WIDTH=/{print $2}'
+}
+
 # Block until [count_visible_class CLS] equals EXPECTED, up to TIMEOUT seconds.
 # Usage: wait_for_visible_count xterm 1
 wait_for_visible_count() {

@@ -78,10 +78,65 @@ scenario_close_focused() {
     wait_for_visible_count xterm 0 3 || return 1
 }
 
+scenario_layout_cycle() {
+    # Cycle Tall → Wide → Full → Tall and assert the first xterm's WIDTH
+    # changes per layout (an easy-to-measure proxy for "geometry actually
+    # got re-applied"):
+    #
+    #   Tall  on 800x600: first xterm w = 400 (half of screen, left col)
+    #   Wide  on 800x600: first xterm w = 800 (master fills width)
+    #   Full  on 800x600: first xterm w = 800 (everyone full screen)
+    #   Tall  again:      first xterm w = 400 (back to half)
+    #
+    # We don't compare to absolute values — just to each other across
+    # the cycle — so screen dimensions can change without breaking us.
+
+    # Spawn two xterms (prior scenarios left state at 0 visible).
+    send_key super+Return
+    wait_for_visible_count xterm 1 5 || return 1
+    send_key super+Return
+    wait_for_visible_count xterm 2 5 || return 1
+    sleep 0.3                                      # let Tall apply
+
+    local w_tall1; w_tall1=$(first_visible_width xterm)
+
+    # Cycle to Wide.
+    send_key super+space
+    sleep 0.3
+    local w_wide; w_wide=$(first_visible_width xterm)
+
+    if [[ "$w_wide" = "$w_tall1" ]]; then
+        echo "smoke: width unchanged Tall→Wide ($w_tall1 → $w_wide)"
+        return 1
+    fi
+
+    # Cycle to Full.
+    send_key super+space
+    sleep 0.3
+    local w_full; w_full=$(first_visible_width xterm)
+
+    # Full's master should be at least as wide as Wide's (both fill width).
+    if [[ "$w_full" -lt "$w_wide" ]]; then
+        echo "smoke: Full width < Wide width ($w_full < $w_wide)"
+        return 1
+    fi
+
+    # Cycle back to Tall — width should drop again.
+    send_key super+space
+    sleep 0.3
+    local w_tall2; w_tall2=$(first_visible_width xterm)
+
+    if [[ "$w_tall2" != "$w_tall1" ]]; then
+        echo "smoke: cycle did not return to Tall width ($w_tall2 != $w_tall1)"
+        return 1
+    fi
+}
+
 SCENARIOS=(
     scenario_keypress_fires
     scenario_workspace_hide_show
     scenario_close_focused
+    scenario_layout_cycle
 )
 
 # ----------------------------------------------------------------------
