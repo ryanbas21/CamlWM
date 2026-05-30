@@ -15,7 +15,7 @@ prefer — xmobar, polybar, etc., once EWMH compatibility lands).
 
  I am not an OCaml developer, I am learning OCaml as I develop this.
 
- I used AI to help guide me through a project that I was not familiar with how to developer as I learn the language and solve problems.
+ I used AI to help guide me through a project that I was not familiar with how to develop as I learn the language and solve problems.
 
  This is clearly, heavily inspired by XMonad which I prefer as a window manager. Eventually I may change / deter off XMonad's path as I see fit.
 
