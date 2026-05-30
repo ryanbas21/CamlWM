@@ -1,11 +1,20 @@
-(*****
-     +-----------------+
-     |     master      |
-     +------+-----+----+
-     |  s1  | s2  | s3 |
-     +------+-----+----+
+(* "Wide" — Tall rotated 90°. Master on top, slaves side-by-side
+   along the bottom.
 
-   *****)
+       +-----------------------------+
+       |          master             |
+       +---------+---------+---------+
+       |  s_0    |   s_1   |   s_2   |
+       +---------+---------+---------+
+
+   Geometry (for screen w × h, n slaves):
+     master   : x=0,           y=0,    w=w,   h=h/2
+     slave i  : x=i*(w/n),     y=h/2,  w=w/n, h=h/2
+
+   Mirror of [Tall]: where Tall halves [sw] (the width), Wide halves
+   [sh] (the height); where Tall steps slaves down by [sh/n] in y,
+   Wide steps them across by [sw/n] in x. *)
+
 open Stack_set
 open Geometry
 

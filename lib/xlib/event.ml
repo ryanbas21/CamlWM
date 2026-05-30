@@ -1,3 +1,11 @@
+(* OCaml view of the X event union.
+
+   At the wire level, an X event is a single ~192-byte buffer whose
+   first 4 bytes are the event type and whose remaining fields are
+   interpreted differently per type. We decode that buffer into a
+   variant so handlers in [bin/main.ml] can pattern-match exhaustively
+   instead of doing offset math. *)
+
 type window = int
 type modifiers = int
 type key_press = { window : window; keycode : int; state : modifiers }

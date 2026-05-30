@@ -49,7 +49,28 @@ val move_resize : t -> window:window -> x:int -> y:int -> w:int -> h:int -> unit
 val kill_client : t -> window -> unit
 (** Forcibly disconnect the client owning [window]. The client's resources
     (including the window) are destroyed by the X server, which delivers
-    DestroyNotify back to us. *)
+    DestroyNotify back to us.
+
+    Most callers should prefer [close_window] which tries the polite
+    [WM_DELETE_WINDOW] protocol first. *)
+
+val close_window : t -> window -> unit
+(** Try to close [window] politely by sending the [WM_DELETE_WINDOW]
+    client message — the application can prompt-to-save, etc., before
+    closing itself. Falls back to [kill_client] if the window does not
+    advertise [WM_DELETE_WINDOW] in its [WM_PROTOCOLS] property. *)
+
+(** {1 Properties} *)
+
+type strut = { left : int; right : int; top : int; bottom : int }
+(** Pixels reserved at each screen edge by a docked window
+    (e.g. a status bar). *)
+
+val read_strut : t -> window -> strut option
+(** Read [_NET_WM_STRUT_PARTIAL] (preferred) or the older
+    [_NET_WM_STRUT] from [window]. Returns [None] when the window does
+    not advertise either property — i.e. it isn't a dock/bar and
+    should be tiled normally. *)
 
 (** {1 Keyboard} *)
 

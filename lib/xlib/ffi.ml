@@ -28,10 +28,20 @@ let window_t : Unsigned.ulong typ = ulong
 let keycode_t : Unsigned.uchar typ = uchar
 let keysym_t : Unsigned.ulong typ = ulong
 
-(* ---------- Display Indication   ---------- *)
+(* X11 Atom — an interned string identifier for properties and messages.
+   Same wire type as Window (unsigned long XID). *)
+let atom_t : Unsigned.ulong typ = ulong
+
+(* ---------- Window border (focus indication) ---------- *)
+
+(* int XSetWindowBorder(Display *display, Window w, unsigned long pixel);
+   Sets the border colour. [pixel] is a raw RGB value on TrueColor visuals. *)
 let x_set_window_border =
   foreign "XSetWindowBorder" (display_t @-> window_t @-> ulong @-> returning int)
 
+(* int XSetWindowBorderWidth(Display *display, Window w, unsigned int width);
+   Sets border thickness in pixels. Borders sit *outside* the window's
+   geometry — a w=400 window with border=2 occupies 404px on screen. *)
 let x_set_window_border_width =
   foreign "XSetWindowBorderWidth"
     (display_t @-> window_t @-> uint @-> returning int)
@@ -95,6 +105,52 @@ let x_move_resize_window =
 
 let x_kill_client =
   foreign "XKillClient" (display_t @-> window_t @-> returning int)
+
+(* ---------- Atoms, properties, client messages ---------- *)
+
+(* Atom XInternAtom(Display *display, const char *name, Bool only_if_exists);
+   only_if_exists=false means "create if missing", which is the usual choice. *)
+let x_intern_atom =
+  foreign "XInternAtom" (display_t @-> string @-> bool @-> returning atom_t)
+
+(* Status XGetWMProtocols(Display *, Window, Atom **protocols_return,
+                          int *count_return);
+   On success returns 1 and fills the output ptrs. Caller must XFree the
+   returned array. *)
+let x_get_wm_protocols =
+  foreign "XGetWMProtocols"
+    (display_t @-> window_t @-> ptr (ptr atom_t) @-> ptr int @-> returning int)
+
+(* void XFree(void *data); — release memory allocated by Xlib. *)
+let x_free = foreign "XFree" (ptr void @-> returning void)
+
+(* int XGetWindowProperty(Display *, Window, Atom property,
+                           long offset, long length, Bool delete,
+                           Atom req_type,
+                           Atom *actual_type_return,
+                           int *actual_format_return,
+                           unsigned long *nitems_return,
+                           unsigned long *bytes_after_return,
+                           unsigned char **prop_return);
+
+   Returns Success (0) always; check [*nitems_return > 0] and
+   [*actual_type_return = req_type] to detect "property present".
+   Caller must XFree [*prop_return] when not null. *)
+let x_get_window_property =
+  foreign "XGetWindowProperty"
+    (display_t @-> window_t @-> atom_t @-> long @-> long @-> bool
+     @-> atom_t @-> ptr atom_t @-> ptr int @-> ptr ulong @-> ptr ulong
+     @-> ptr (ptr uchar) @-> returning int)
+
+(* Built-in atom for the CARDINAL type, defined in <X11/Xatom.h> as
+   XA_CARDINAL = 6. Server-allocated, never changes — no need to
+   XInternAtom it. *)
+let atom_cardinal : Unsigned.ulong = Unsigned.ULong.of_int 6
+
+(* Status XSendEvent(Display *, Window, Bool propagate, long mask, XEvent*ev); *)
+let x_send_event =
+  foreign "XSendEvent"
+    (display_t @-> window_t @-> bool @-> long @-> ptr char @-> returning int)
 (* ---------- Keyboard ---------- *)
 
 (* KeyCode XKeysymToKeycode(Display *display, KeySym keysym); *)

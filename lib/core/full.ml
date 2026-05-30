@@ -1,3 +1,10 @@
+(* "Full" — every window gets the same screen-filling rect; whichever
+   window is on top in the X stacking order is what the user sees.
+
+   No master/slaves distinction, no math beyond "everyone gets the
+   screen". The visible window changes when focus does (since X raises
+   the focused window). *)
+
 open Stack_set
 open Geometry
 

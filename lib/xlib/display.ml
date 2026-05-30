@@ -2,11 +2,27 @@ open Ctypes
 
 type window = int
 
+(* The Display handle plus all per-connection state worth caching:
+     raw         — the libX11 Display* pointer (opaque to us)
+     event_buf   — a single ~192-byte buffer reused for every
+                   XNextEvent call; saves an allocation per event
+     screen      — the default screen number, queried once
+     atom_*      — atoms we'll need repeatedly. Interning is cheap but
+                   doing it at open time means handlers never have to
+                   wonder whether the lookup might fail. *)
 type t = {
-  raw : unit ptr; (* Display *           *)
-  event_buf : char ptr; (* reusable XEvent buf *)
+  raw : unit ptr;
+  event_buf : char ptr;
   screen : int;
+  atom_wm_protocols : Unsigned.ulong;
+  atom_wm_delete_window : Unsigned.ulong;
+  atom_net_wm_strut_partial : Unsigned.ulong;
+  atom_net_wm_strut : Unsigned.ulong;
 }
+
+(* Reserved-edge declaration a status bar (or any docked app) sets via
+   _NET_WM_STRUT[_PARTIAL] so the WM can avoid tiling on top of it. *)
+type strut = { left : int; right : int; top : int; bottom : int }
 
 let open_default () =
   let p = Ffi.x_open_display None in
@@ -15,7 +31,17 @@ let open_default () =
   else
     let screen = Ffi.x_default_screen p in
     let event_buf = allocate_n char ~count:Ffi.xevent_buf_size in
-    Ok { raw = p; event_buf; screen }
+    let atom_wm_protocols = Ffi.x_intern_atom p "WM_PROTOCOLS" false in
+    let atom_wm_delete_window =
+      Ffi.x_intern_atom p "WM_DELETE_WINDOW" false
+    in
+    let atom_net_wm_strut_partial =
+      Ffi.x_intern_atom p "_NET_WM_STRUT_PARTIAL" false
+    in
+    let atom_net_wm_strut = Ffi.x_intern_atom p "_NET_WM_STRUT" false in
+    Ok { raw = p; event_buf; screen;
+         atom_wm_protocols; atom_wm_delete_window;
+         atom_net_wm_strut_partial; atom_net_wm_strut }
 
 let close t = ignore (Ffi.x_close_display t.raw)
 let root_window t = Unsigned.ULong.to_int (Ffi.x_root_window t.raw t.screen)
@@ -45,6 +71,74 @@ let unmap_window t w =
   ignore (Ffi.x_unmap_window t.raw (Unsigned.ULong.of_int w))
 
 let kill_client t w = ignore (Ffi.x_kill_client t.raw (Unsigned.ULong.of_int w))
+
+(* ---------- Polite close (WM_DELETE_WINDOW) ----------
+
+   Workflow:
+     1. Read WM_PROTOCOLS from the window (list of atoms the app supports).
+     2. If WM_DELETE_WINDOW is in the list, build a ClientMessage event
+        and XSendEvent it to the window.
+     3. Otherwise, fall back to XKillClient.
+
+   XClientMessageEvent layout on x86_64 (offsets matter for the buffer):
+       int type;            // 0   (ClientMessage = 33)
+       unsigned long serial;// 8
+       Bool send_event;     // 16
+       Display *display;    // 24
+       Window window;       // 32
+       Atom message_type;   // 40
+       int format;          // 48  (32 for 32-bit data)
+       union {              // 56
+         long l[5];         //  data.l[0..4]
+       } data;
+   Total payload: 96 bytes. We zero the buffer then write only the
+   fields the server cares about. *)
+
+let read_wm_protocols t w : Unsigned.ulong list =
+  let protos_pp = allocate (ptr Ffi.atom_t) (from_voidp Ffi.atom_t null) in
+  let count_p = allocate int 0 in
+  let status =
+    Ffi.x_get_wm_protocols t.raw (Unsigned.ULong.of_int w) protos_pp count_p
+  in
+  if status = 0 then []
+  else
+    let protos_p = !@protos_pp in
+    let count = !@count_p in
+    let atoms = List.init count (fun i -> !@(protos_p +@ i)) in
+    Ffi.x_free (to_voidp protos_p);
+    atoms
+
+let send_wm_delete t w =
+  let buf = allocate_n char ~count:Ffi.xevent_buf_size in
+  for i = 0 to Ffi.xevent_buf_size - 1 do
+    buf +@ i <-@ '\000'
+  done;
+  let set_int off v = from_voidp int (to_voidp (buf +@ off)) <-@ v in
+  let set_ulong off v =
+    from_voidp ulong (to_voidp (buf +@ off)) <-@ v
+  in
+  let set_long off v =
+    from_voidp long (to_voidp (buf +@ off)) <-@ v
+  in
+  set_int 0 33;                              (* ClientMessage *)
+  set_ulong 32 (Unsigned.ULong.of_int w);    (* window *)
+  set_ulong 40 t.atom_wm_protocols;          (* message_type *)
+  set_int 48 32;                             (* format = 32 *)
+  set_long 56                                (* data.l[0] = WM_DELETE_WINDOW *)
+    (Signed.Long.of_int
+       (Unsigned.ULong.to_int t.atom_wm_delete_window));
+  set_long 64 (Signed.Long.of_int 0);        (* data.l[1] = CurrentTime *)
+  ignore
+    (Ffi.x_send_event t.raw (Unsigned.ULong.of_int w) false
+       (Signed.Long.of_int 0) buf)
+
+let close_window t w =
+  let protocols = read_wm_protocols t w in
+  if List.exists
+       (fun a -> Unsigned.ULong.compare a t.atom_wm_delete_window = 0)
+       protocols
+  then send_wm_delete t w
+  else kill_client t w
 
 let move_resize t ~window ~x ~y ~w ~h =
   ignore
@@ -88,5 +182,72 @@ let set_border_width t w width =
 
 let set_border_color t w color =
   ignore
-    (Ffi.x_set_window_border_width t.raw (Unsigned.ULong.of_int w)
-       (Unsigned.UInt.of_int color))
+    (Ffi.x_set_window_border t.raw (Unsigned.ULong.of_int w)
+       (Unsigned.ULong.of_int color))
+
+(* ---------- Properties (CARDINAL arrays) ----------
+
+   Reading X11 properties via [XGetWindowProperty] is unwieldy: 6 output
+   ptrs, a returned [unsigned char *] that for format=32 is actually a
+   [long *] (an Xlib quirk on 64-bit Linux — 32-bit-on-the-wire becomes
+   64-bit-in-memory), and a manual XFree of the result.
+
+   [read_cardinal_property] hides all that and returns a clean [int list option]
+   for the common case of "read up to N 32-bit CARDINALs into an OCaml list".
+   None means "property is absent or wrong type". *)
+
+let read_cardinal_property t window atom ~max_count : int list option =
+  let actual_type = allocate Ffi.atom_t (Unsigned.ULong.of_int 0) in
+  let actual_format = allocate int 0 in
+  let nitems = allocate ulong (Unsigned.ULong.of_int 0) in
+  let bytes_after = allocate ulong (Unsigned.ULong.of_int 0) in
+  let prop = allocate (ptr uchar) (from_voidp uchar null) in
+  let _status =
+    Ffi.x_get_window_property t.raw
+      (Unsigned.ULong.of_int window) atom
+      (Signed.Long.of_int 0)
+      (Signed.Long.of_int max_count)
+      false
+      Ffi.atom_cardinal
+      actual_type actual_format nitems bytes_after prop
+  in
+  let n = Unsigned.ULong.to_int !@nitems in
+  let format = !@actual_format in
+  let returned_type = !@actual_type in
+  (* "None" type (Unsigned.ULong 0) means the property wasn't set. *)
+  let type_ok = Unsigned.ULong.compare returned_type Ffi.atom_cardinal = 0 in
+  if (not type_ok) || n = 0 || format <> 32 then begin
+    if not (is_null !@prop) then Ffi.x_free (to_voidp !@prop);
+    None
+  end else begin
+    (* Read [n] longs (8 bytes each on x86_64) out of the returned buffer. *)
+    let p = !@prop in
+    let longs =
+      List.init n (fun i ->
+        let lp = from_voidp long (to_voidp (p +@ (i * 8))) in
+        Signed.Long.to_int !@lp)
+    in
+    Ffi.x_free (to_voidp p);
+    Some longs
+  end
+
+(* Read a window's strut declaration, preferring the newer
+   _NET_WM_STRUT_PARTIAL (12 cardinals; we use only the first 4)
+   and falling back to _NET_WM_STRUT (just the 4). [None] means
+   "this window does not reserve any screen edge". *)
+let read_strut t window : strut option =
+  let from_first4 = function
+    | left :: right :: top :: bottom :: _ ->
+        Some { left; right; top; bottom }
+    | _ -> None
+  in
+  match
+    read_cardinal_property t window t.atom_net_wm_strut_partial ~max_count:12
+  with
+  | Some longs -> from_first4 longs
+  | None ->
+    (match
+       read_cardinal_property t window t.atom_net_wm_strut ~max_count:4
+     with
+     | Some longs -> from_first4 longs
+     | None -> None)
