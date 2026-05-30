@@ -45,6 +45,7 @@
           xorg.xorgserver   # provides Xephyr binary
           xorg.xinit
           xterm             # something to launch inside the nested X server
+          xdotool           # simulate input events for smoke tests
         ];
 
       in {

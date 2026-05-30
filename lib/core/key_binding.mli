@@ -1,0 +1,15 @@
+type action =
+  (* launch a process: ["xterm"], ["firefox"; "--new-window"] *)
+  | Spawn of string list
+  | Focus_next (* Stack_set.focus_down *)
+  | Focus_prev (* Stack_set.focus_up *)
+  | Close_focused (* tell X to close the focused window *)
+  | Swap_master (* Stack_set.swap_master *)
+
+type t = { modifiers : int; key : string; action : action }
+
+val shift : int
+val control : int
+val mod1 : int
+val mod4 : int
+val mods : int list -> int

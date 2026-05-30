@@ -1,26 +1,30 @@
-(* camlwm: tiling WM main entry point.
-
-   This binary is the glue between the pure core and the X server:
-
-     X events ──► handle_event ──► updated Stack_set
-                                       │
-                                       ▼
-                                  apply_layout
-                                       │
-                                       ▼
-                          Display.move_resize / map_window
-
-   Each loop iteration: pull one event, mutate state, retile, repeat.
-
-   Handoff: ryan.
-   What's filled in :  boilerplate (display open, error handler, event
-                       loop wiring, Map_request handler as the worked
-                       example, apply_layout).
-   What's TODO for you: the initial Stack_set and the two delete-style
-                        event branches (Unmap_notify, Destroy_notify). *)
-
 open Camlwm_core
 open Camlwm_xlib
+
+let bindings : Key_binding.t list =
+  [
+    {
+      modifiers = Key_binding.mod4;
+      key = "Return";
+      action = Spawn [ "xterm"; "-fa"; "Monospace"; "-fs"; "12" ];
+    };
+    { modifiers = Key_binding.mod4; key = "j"; action = Focus_next };
+    { modifiers = Key_binding.mod4; key = "k"; action = Focus_prev };
+    { modifiers = Key_binding.mod4; key = "space"; action = Swap_master };
+  ]
+
+let run_action _display action state =
+  match action with
+  | Key_binding.Focus_next -> Stack_set.focus_down state
+  | Key_binding.Focus_prev -> Stack_set.focus_up state
+  | Key_binding.Swap_master -> Stack_set.swap_master state
+  | Key_binding.Spawn cmd ->
+      (match Unix.fork () with
+      | 0 -> (
+          try Unix.execvp (List.hd cmd) (Array.of_list cmd) with _ -> exit 127)
+      | _ -> ());
+      state
+  | Key_binding.Close_focused -> state
 
 (* ----------------------------------------------------------------- *)
 (* Configuration (hardcoded for Phase 1)                              *)
@@ -79,9 +83,21 @@ let handle_event display (event : Event.t) (state : unit Stack_set.t) :
        so the client gets the size we *do* want it at.) *)
       log "Configure_request: window=%d (ignored, layout decides)" window;
       state
-  | Key_press _ ->
-      (* Phase 2: dispatch keybindings. *)
-      state
+  | Key_press { keycode; state = modifiers; _ } -> (
+      log "Key_press: keycode=%d modifiers=%d" keycode modifiers;
+      let matching =
+        List.find_opt
+          (fun (b : Key_binding.t) ->
+            let kc =
+              Display.keycode_of_keysym display
+                ~keysym:(Display.keysym_of_string b.key)
+            in
+            kc = keycode && b.modifiers = modifiers)
+          bindings
+      in
+      match matching with
+      | None -> state
+      | Some b -> run_action display b.action state)
   | Other { event_type } ->
       log "Other event type=%d (ignored)" event_type;
       state
@@ -108,15 +124,15 @@ let main () =
       Display.select_root_wm_events display ~window:root;
       Display.sync display ~discard:false;
       log "Selected WM events on root window %d" root;
+      (* Grab keybindings *)
+      List.iter
+        (fun (binding : Key_binding.t) ->
+          let keysym = Display.keysym_of_string binding.key in
+          let keycode = Display.keycode_of_keysym display ~keysym in
+          Display.grab_key display ~window:root ~keycode
+            ~modifiers:binding.modifiers)
+        bindings;
 
-      (* TODO #3: build the initial Stack_set.
-       Open lib/core/stack_set.mli and look at [val empty] — the
-       parameter names tell you what to pass:
-         - [layouts]: any value of type 'l. For Phase 1 we ignore
-                      layouts and just pass [()].
-         - [tags]:    [initial_tags] (defined at the top of this file).
-         - [screens]: a list with one element, [screen_detail].
-       Wrap the result in a [ref] so we can mutate it in the loop. *)
       let state : unit Stack_set.t ref =
         ref
         @@ Stack_set.empty ~layouts:() ~tags:initial_tags
