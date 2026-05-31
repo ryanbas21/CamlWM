@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
 
-# Only one publish at a time.
 concurrency:
   group: aur-publish
   cancel-in-progress: true
@@ -32,13 +31,28 @@ jobs:
       - name: Clone AUR repo
         run: git clone ssh://aur@aur.archlinux.org/camlwm-git.git aur-repo
 
-      - name: Update PKGBUILD
-        run: cp PKGBUILD aur-repo/PKGBUILD
-
-      - name: Generate .SRCINFO
-        uses: docker://archlinux:latest
-        with:
-          args: bash -c "cd /github/workspace/aur-repo && makepkg --printsrcinfo > .SRCINFO"
+      - name: Update PKGBUILD and generate .SRCINFO
+        run: |
+          cp PKGBUILD aur-repo/PKGBUILD
+          cd aur-repo
+          printf 'pkgbase = camlwm-git\n' > .SRCINFO
+          printf '\tpkgdesc = xmonad-style tiling window manager for X11, written in OCaml\n' >> .SRCINFO
+          printf '\tpkgver = 0.1.0\n' >> .SRCINFO
+          printf '\tpkgrel = 1\n' >> .SRCINFO
+          printf '\turl = https://github.com/ryanbas21/CamlWM\n' >> .SRCINFO
+          printf '\tarch = x86_64\n' >> .SRCINFO
+          printf '\tlicense = MIT\n' >> .SRCINFO
+          printf '\tmakedepends = git\n' >> .SRCINFO
+          printf '\tmakedepends = ocaml\n' >> .SRCINFO
+          printf '\tmakedepends = dune\n' >> .SRCINFO
+          printf '\tmakedepends = ocaml-ctypes\n' >> .SRCINFO
+          printf '\tmakedepends = ocaml-findlib\n' >> .SRCINFO
+          printf '\tdepends = libx11\n' >> .SRCINFO
+          printf '\tprovides = camlwm\n' >> .SRCINFO
+          printf '\tconflicts = camlwm\n' >> .SRCINFO
+          printf '\tsource = git+https://github.com/ryanbas21/CamlWM.git\n' >> .SRCINFO
+          printf '\tsha256sums = SKIP\n' >> .SRCINFO
+          printf '\npkgname = camlwm-git\n' >> .SRCINFO
 
       - name: Push to AUR
         run: |
