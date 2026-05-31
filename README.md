@@ -68,10 +68,12 @@ DISPLAY=:10 camlwm
 - **Manage hooks**: per-window rules based on `WM_CLASS` / `WM_NAME`
 - **Compiled configuration**: xmonad-style `~/.config/camlwm/config.ml`
 - **Strut support**: status bars reserve screen edges
+- **EWMH properties**: `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`,
+  `_NET_CLIENT_LIST`, `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`,
+  `_NET_SUPPORTED` -- status bars can read workspace and window state
 
 ## Missing for daily use
 
-- EWMH properties (status bars can't read workspace state)
 - Floating windows
 - Focus follows mouse / click to focus
 - Mouse bindings (drag to move/resize)
