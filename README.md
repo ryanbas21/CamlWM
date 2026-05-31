@@ -1,5 +1,8 @@
 # camlWM
 
+[![AUR](https://img.shields.io/aur/version/camlwm-git)](https://aur.archlinux.org/packages/camlwm-git)
+[![CI](https://github.com/ryanbas21/CamlWM/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanbas21/CamlWM/actions/workflows/ci.yml)
+
 A minimal tiling window manager for X11, written in OCaml. Modelled
 closely on [xmonad](https://xmonad.org/): pure-functional core,
 compiled configuration, no built-in status bar.
