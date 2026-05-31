@@ -132,11 +132,40 @@ scenario_layout_cycle() {
     fi
 }
 
+scenario_directional_bindings_grabbed() {
+    # All four directional bindings (Mod4+h/j/k/l) should produce a
+    # Key_press log line — proving XGrabKey succeeded for each.
+    #
+    # NOTE: this asserts the grab works, NOT that focus actually moves
+    # to the geometrically-correct window. We don't set
+    # _NET_ACTIVE_WINDOW, so xdotool can't query focus, and verifying
+    # by border colour would need xprop/image inspection. Visual check
+    # in Xephyr is the source of truth for correctness today.
+
+    # Need at least 2 windows so directional has somewhere to focus to.
+    local n; n=$(count_visible_class xterm)
+    while [[ "$n" -lt 2 ]]; do
+        send_key super+Return
+        sleep 0.3
+        n=$(count_visible_class xterm)
+    done
+
+    for combo in super+h super+l super+j super+k; do
+        local before; before=$(count_log_matches "Key_press")
+        send_key "$combo"
+        wait_for_log_increment "Key_press" "$before" 2 || {
+            echo "smoke: $combo never reached the WM"
+            return 1
+        }
+    done
+}
+
 SCENARIOS=(
     scenario_keypress_fires
     scenario_workspace_hide_show
     scenario_close_focused
     scenario_layout_cycle
+    scenario_directional_bindings_grabbed
 )
 
 # ----------------------------------------------------------------------

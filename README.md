@@ -5,10 +5,12 @@ closely on [xmonad](https://xmonad.org/): pure-functional core,
 compiled configuration, no built-in status bar (use whatever you
 prefer — xmobar, polybar, etc., once EWMH compatibility lands).
 
-> **Status: early development.** Phase 2 of the implementation is
-> complete. The WM works end-to-end inside Xephyr and is functional
-> for basic tasks, but it is **not yet daily-drivable** — see
-> [What works](#what-works) and [Missing for daily use](#missing-for-daily-use).
+> **Status: early development.** Phase 2.5 of the implementation is
+> complete. The WM works end-to-end inside Xephyr; it has focus
+> borders, polite close, strut support, and directional focus on top
+> of the original tiling + workspace foundation. Still not yet
+> daily-drivable on its own — see [What works](#what-works) and
+> [Missing for daily use](#missing-for-daily-use).
 
 ## Note from me
  This was done using Claude as a learning tool for Ocaml. 
@@ -65,21 +67,47 @@ DISPLAY=:10 dune exec camlwm
 
 ## What works
 
-- Tiling with three built-in layouts: **Tall** (master left, slaves
-  right), **Wide** (master top, slaves bottom), **Full** (all windows
-  overlap full-screen)
-- Cycling between layouts with one key
-- Nine workspaces, fully xmonad-style:
-  - Switch the visible workspace
-  - Send the focused window to a named workspace
-- Spawning processes from keybindings
-- Closing the focused window (currently a hard kill — see [polite
-  close](#missing-for-daily-use))
+**Tiling**
+- Three built-in layouts: **Tall** (master left, slaves right),
+  **Wide** (master top, slaves bottom), **Full** (all windows overlap
+  full-screen)
+- Cycling between layouts with one key; each workspace remembers its
+  own layout
+- Pixel gaps between tiled windows + at screen edges
+- Borders compensate for gap geometry so windows don't visually
+  overflow
+
+**Workspaces (xmonad-style)**
+- Nine workspaces; switch the visible one or send the focused window
+  to a different one
+- Per-workspace layout state survives switching back and forth
+
+**Focus**
+- Coloured borders on the focused window (blue) vs everything else
+  (grey)
+- Stack-order navigation (`Focus_next`/`Focus_prev` — defined but
+  unbound by default)
+- **Directional** focus: jump to the window geometrically left, right,
+  above, or below the current focus
+
+**Window lifecycle**
+- Spawning processes from keybindings (`fork` + `execvp`)
+- **Polite close** via `WM_DELETE_WINDOW` — apps get a chance to
+  prompt-to-save; falls back to `XKillClient` if the client doesn't
+  advertise the protocol
 - Window swapping (move focused to master position)
-- Pixel gaps between tiled windows
-- An X error handler so a stale window reference does not crash the WM
-- A pending-unmaps counter that distinguishes WM-initiated unmaps
-  (workspace switches) from genuine client-initiated unmaps
+
+**Robustness**
+- X error handler so a stale window reference doesn't crash the WM
+- Pending-unmaps counter distinguishes WM-initiated unmaps (workspace
+  switches) from genuine client-initiated unmaps
+- All key bindings registered against every combination of
+  NumLock/CapsLock so lock-key state never silently breaks bindings
+
+**Status-bar interop**
+- **Strut support**: windows declaring `_NET_WM_STRUT_PARTIAL` (or
+  the older `_NET_WM_STRUT`) reserve screen edges; tiled windows
+  shrink to fit the remaining usable area
 
 ## Missing for daily use
 
@@ -88,20 +116,28 @@ of trying to actually live in camlWM. Listed in roughly the order they
 will frustrate you:
 
 - **Floating windows.** Every window is force-tiled, including 200×100
-  dialog boxes that should float in the middle of the screen.
-- **Focus indication.** No coloured borders or other visual cue. You
-  cannot tell which window is focused except by trying to type.
-- **Polite close.** `Mod4+q` forcibly disconnects the client via
-  `XKillClient` with no chance to save state. The polite
-  `WM_DELETE_WINDOW` protocol is not yet implemented.
-- **Strut support.** When you eventually hook up a status bar, the bar
-  will overlap with tiled windows because camlWM does not know about
-  the screen area it reserves.
-- **Multi-monitor.** Single-display only; no Xinerama query.
+  dialog boxes that should float in the middle of the screen. Stack_set
+  already models a `floating` field; we just don't populate or honour
+  it yet.
 - **Configuration as data.** All bindings, colours, layouts, and
   workspace names are hardcoded in `bin/main.ml`. Changing them
   requires editing the source and rebuilding. A `Config.t` extraction
-  + user `~/.config/camlwm/config.ml` is on the roadmap.
+  + user `~/.config/camlwm/config.ml` is the next major phase.
+- **EWMH properties on root.** Status bars query `_NET_CURRENT_DESKTOP`,
+  `_NET_ACTIVE_WINDOW`, etc.; we don't set them yet, so bars will show
+  stale or empty workspace info.
+- **Manage hooks** — per-application rules ("Firefox always on ws
+  'web', Slack always floats"). Currently every new window goes to the
+  current workspace, tiled, no exceptions.
+- **Multi-monitor.** Single-display only; no Xinerama query.
+- **Master count / split ratio.** Tall and Wide are hardcoded at 1
+  master, 50/50 split. xmonad lets you press `Mod+,/.` for master
+  count and `Mod+h/l` to resize — but `h/l` are our directional
+  bindings, so the rebind would need thought.
+- **Mouse bindings.** Drag to move/resize floating windows. None.
+- **Restart-in-place.** xmonad recompiles its config and reloads
+  without losing window state. Would only matter once we have a
+  user-config story.
 
 ## Keybindings
 
@@ -110,13 +146,19 @@ will frustrate you:
 | Binding              | Action                          |
 | -------------------- | ------------------------------- |
 | `Mod4+Return`        | Spawn xterm                     |
-| `Mod4+j`             | Focus next window               |
-| `Mod4+k`             | Focus previous window           |
+| `Mod4+h`             | Focus window to the left        |
+| `Mod4+l`             | Focus window to the right       |
+| `Mod4+j`             | Focus window below              |
+| `Mod4+k`             | Focus window above              |
 | `Mod4+m`             | Swap focused window with master |
 | `Mod4+Space`         | Cycle layout (Tall → Wide → Full → Tall) |
-| `Mod4+q`             | Close focused window (hard kill, no prompt) |
+| `Mod4+q`             | Close focused window (polite, falls back to kill) |
 | `Mod4+1` … `Mod4+9`  | View workspace 1–9              |
 | `Mod4+Shift+1` … `9` | Send focused window to workspace 1–9 |
+
+`Focus_next` / `Focus_prev` (stack-order navigation, what xmonad's
+default Mod+j/k does) are defined in the action variant but unbound
+by default — bind them if you'd rather have that than directional.
 
 Bindings are registered against all four combinations of
 NumLock/CapsLock state, so lock keys do not prevent matches.
@@ -132,6 +174,8 @@ For now, configuration is done by editing source files and rebuilding:
 | Workspace tags        | `initial_tags` in `bin/main.ml` |
 | Screen dimensions     | `screen_detail` in `bin/main.ml` |
 | Gap between windows   | `gap` in `bin/main.ml`         |
+| Border width          | `border_width` in `bin/main.ml` |
+| Focus / unfocus colours | `focused_color`, `unfocused_color` in `bin/main.ml` |
 | Spawn command         | `Spawn [...]` payload in a binding |
 
 The plan (see [Roadmap](#roadmap)) is to extract a `Config.t` record
@@ -144,7 +188,8 @@ Four-layer cake, deliberately separated so each piece is independently
 testable:
 
 ```
-bin/main.ml         glue — event loop, action dispatch, layout application
+bin/main.ml         glue — event loop, action dispatch, layout
+                          application, pending-unmaps tracking
   │
   ├── camlwm.core   pure, testable, no X11:
   │                   Stack_set    — focused zipper-of-zippers (state)
@@ -169,12 +214,32 @@ policy (which events to handle, what to do with them) lives in `bin/`.
 
 ```fish
 dune build               # compile everything
-dune runtest             # run alcotest unit tests
+dune runtest             # run alcotest unit tests (47 tests)
 dune exec camlwm         # run the WM (against whatever $DISPLAY points at)
 ```
 
 A `dune build --watch` loop in one terminal is the recommended setup —
 saves you from chasing stale build artefacts.
+
+### CI
+
+GitHub Actions runs on every push and PR (see `.github/workflows/ci.yml`):
+
+- Installs Nix and enters the flake's dev shell
+- Builds (`dune build`)
+- Runs unit tests (`dune runtest`)
+
+Smoke tests are intentionally not in CI — they spawn Xephyr + drive an
+xdotool synthetic-input loop, which adds flakiness for too little
+return at this stage. Run them locally with `bash test/smoke/run.sh`.
+
+### Editor tasks
+
+`.vscode/tasks.json` defines tasks consumable by
+[overseer.nvim](https://github.com/stevearc/overseer.nvim) and VSCode:
+build (one-shot + watch), unit tests, smoke tests, clean, and a
+"launch in Xephyr :10" task that boots a nested X server and runs the
+WM in one go.
 
 ### Smoke tests
 
@@ -189,6 +254,18 @@ Each scenario asserts on `camlwm`'s log output and on visible window
 state (count, geometry). The scenarios are documented inline in
 `test/smoke/run.sh`. Adding a scenario means appending a function to
 that file and adding its name to `SCENARIOS`.
+
+Current scenarios:
+- `scenario_keypress_fires` — Mod4+Return produces a Key_press log line
+- `scenario_workspace_hide_show` — spawn xterm, switch to ws 2 (hides),
+  switch back to ws 1 (xterm reappears, proving the pending-unmaps
+  counter works)
+- `scenario_close_focused` — Mod4+q kills the focused xterm
+- `scenario_layout_cycle` — Mod4+Space rotates Tall → Wide → Full → Tall
+  and the first xterm's width changes appropriately each step
+- `scenario_directional_bindings_grabbed` — Mod4+h/j/k/l each produce
+  a fresh Key_press log line (proves the grabs are registered; not
+  geometric correctness)
 
 ### Project layout
 
@@ -214,12 +291,17 @@ camlwm/
 │       └── dune
 ├── test/
 │   ├── test_camlwm.ml      alcotest entry point
-│   ├── test_stack_set.ml
-│   ├── test_tall.ml
+│   ├── test_stack_set.ml   32 tests
+│   ├── test_layout.ml      Layout record dispatch + name uniqueness
+│   ├── test_tall.ml        layout geometry
+│   ├── test_wide.ml        layout geometry
+│   ├── test_full.ml        layout geometry
 │   ├── smoke/              end-to-end harness
 │   │   ├── run.sh
 │   │   └── lib.sh
 │   └── dune
+├── .github/workflows/ci.yml
+├── .vscode/tasks.json
 ├── flake.nix               reproducible dev shell
 ├── dune-project
 └── camlwm.opam             auto-generated by dune
@@ -229,25 +311,25 @@ camlwm/
 
 Loose ordering. Treat as a sketch.
 
-**Phase 2.5 — polish toward daily use**
-- Focus indication (window borders)
-- Polite close via `WM_DELETE_WINDOW` (X atoms + `XSendEvent`)
-- Strut support for status bars
-- Directional focus (focus left/right/up/down by geometry)
-
-**Phase 3 — library + config**
+**Phase 3 — library + config** (next)
 - Extract `Camlwm.run : Config.t -> unit` so `bin/main.ml` is a thin
   default config
 - Discover and recompile `~/.config/camlwm/config.ml` (xmonad-style)
 
 **Phase 3.5 — interoperability**
 - EWMH compliance so status bars can read workspace/window state
+  (`_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`, `_NET_CLIENT_LIST`)
 - Manage hooks (per-application rules: "Firefox always on ws 'web'")
+
+**Phase 4 — proper window lifecycle**
+- Floating windows (drag/resize, dialogs auto-float)
+- Restart-in-place that preserves state
+- Mouse bindings
 
 **Later**
 - More layouts (Mirror combinator, Spiral, Tabbed)
 - Layout parameters (master count, master/slave ratio)
-- Mouse bindings for floating windows
+- Multi-monitor (Xinerama)
 - Urgency hints
 
 ## Licence

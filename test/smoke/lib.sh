@@ -104,6 +104,41 @@ first_visible_width() {
         | awk -F= '/^WIDTH=/{print $2}'
 }
 
+# Count log lines matching a pattern. Used to detect "did this specific
+# action happen *after* this point" — see wait_for_log_increment.
+count_log_matches() {
+    grep -c "$1" "$CAMLWM_LOG" 2>/dev/null || echo 0
+}
+
+# Block until [count_log_matches NEEDLE] exceeds START_COUNT — i.e. a
+# *new* matching line appears. Use when [wait_for_log] would short-
+# circuit because a previous scenario already produced the pattern.
+#
+# Usage:
+#   local before=$(count_log_matches "Key_press")
+#   send_key super+h
+#   wait_for_log_increment "Key_press" "$before" 2 || return 1
+wait_for_log_increment() {
+    local needle="$1"
+    local start_count="$2"
+    local timeout="${3:-2}"
+    local i=0
+    local max=$((timeout * 20))
+    local current
+    while true; do
+        current=$(count_log_matches "$needle")
+        if [[ "$current" -gt "$start_count" ]]; then
+            return 0
+        fi
+        sleep 0.05
+        i=$((i + 1))
+        if [[ $i -ge $max ]]; then
+            echo "smoke: timeout — '$needle' count stayed at $start_count"
+            return 1
+        fi
+    done
+}
+
 # Block until [count_visible_class CLS] equals EXPECTED, up to TIMEOUT seconds.
 # Usage: wait_for_visible_count xterm 1
 wait_for_visible_count() {

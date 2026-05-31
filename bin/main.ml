@@ -85,8 +85,26 @@ let bindings : Key_binding.t list =
       key = "Return";
       action = Spawn [ "xterm"; "-fa"; "Monospace"; "-fs"; "12" ];
     };
-    { Key_binding.modifiers = Key_binding.mod4; key = "j"; action = Focus_next };
-    { Key_binding.modifiers = Key_binding.mod4; key = "k"; action = Focus_prev };
+    {
+      Key_binding.modifiers = Key_binding.mod4;
+      key = "j";
+      action = Focus_direction Down;
+    };
+    {
+      Key_binding.modifiers = Key_binding.mod4;
+      key = "k";
+      action = Focus_direction Up;
+    };
+    {
+      Key_binding.modifiers = Key_binding.mod4;
+      key = "h";
+      action = Focus_direction Left;
+    };
+    {
+      Key_binding.modifiers = Key_binding.mod4;
+      key = "l";
+      action = Focus_direction Right;
+    };
     {
       Key_binding.modifiers = Key_binding.mod4;
       key = "space";
@@ -179,10 +197,53 @@ let next_layout (current : Layout.t) : Layout.t =
    (Spawn, Close_focused) talk to X and return [state] unchanged
    — they rely on subsequent events (Map_request, Destroy_notify)
    to push the state forward reactively. *)
-let run_action display action state =
+let run_action display ~screen action (state : Layout.t Stack_set.t) =
   match action with
   | Key_binding.Focus_next -> Stack_set.focus_down state
   | Key_binding.Focus_prev -> Stack_set.focus_up state
+  | Key_binding.Focus_direction dir ->
+      (* Directional focus: compute current rects from the active
+         layout, find the focused window's rect, then pick the closest
+         other window whose centre is in [dir]. Falls back to "no
+         change" when there's no focused window or no candidate. *)
+      begin match Stack_set.peek state with
+      | None -> state
+      | Some focused_w ->
+        let layout = state.current.workspace.layout in
+        let windows = Stack_set.index state in
+        let rects = layout.do_layout ~screen windows in
+        begin match List.assoc_opt focused_w rects with
+        | None -> state
+        | Some focused_rect ->
+          let center (r : Geometry.rect) =
+            (r.x + (r.w / 2), r.y + (r.h / 2))
+          in
+          let (fcx, fcy) = center focused_rect in
+          (* For each other window, return [Some (w, distance)] if it's
+             in the requested direction relative to the focused centre. *)
+          let scored =
+            List.filter_map (fun (w, r) ->
+              if w = focused_w then None
+              else
+                let (cx, cy) = center r in
+                match dir with
+                | Key_binding.Left  when cx < fcx -> Some (w, fcx - cx)
+                | Key_binding.Right when cx > fcx -> Some (w, cx - fcx)
+                | Key_binding.Up    when cy < fcy -> Some (w, fcy - cy)
+                | Key_binding.Down  when cy > fcy -> Some (w, cy - fcy)
+                | _ -> None) rects
+          in
+          match scored with
+          | [] -> state
+          | first :: rest ->
+            let (best_w, _) =
+              List.fold_left
+                (fun (bw, bd) (w, d) -> if d < bd then (w, d) else (bw, bd))
+                first rest
+            in
+            Stack_set.focus_window best_w state
+        end
+      end
   | Key_binding.Swap_master -> Stack_set.swap_master state
   | Key_binding.Cycle_layout -> Stack_set.modify_layout next_layout state
   | Key_binding.Spawn cmd ->
@@ -279,8 +340,8 @@ let apply_layout display ~screen (state : Layout.t Stack_set.t) =
    the layout afterwards, so handlers only need to update Stack_set
    and call any *required* X side effects (like actually mapping a
    freshly-requested window). *)
-let handle_event display (event : Event.t) (state : Layout.t Stack_set.t) :
-    Layout.t Stack_set.t =
+let handle_event display ~screen (event : Event.t)
+    (state : Layout.t Stack_set.t) : Layout.t Stack_set.t =
   match event with
   (* WORKED EXAMPLE — use this pattern for the two TODOs below. *)
   | Map_request { window } -> (
@@ -327,7 +388,7 @@ let handle_event display (event : Event.t) (state : Layout.t Stack_set.t) :
       in
       match matching with
       | None -> state
-      | Some b -> run_action display b.action state)
+      | Some b -> run_action display ~screen b.action state)
   | Other { event_type } ->
       log "Other event type=%d (ignored)" event_type;
       state
@@ -396,9 +457,12 @@ let main () =
          wouldn't have a colour set until the *next* event arrived. *)
       let rec loop () =
         let event = Display.next_event display in
-        state := handle_event display event !state;
+        (* Compute usable screen once per iteration; reuse for both
+           handle_event (directional focus needs it) and apply_layout. *)
+        let screen = usable_screen () in
+        state := handle_event display ~screen event !state;
         reconcile_visibility display !state;
-        apply_layout ~screen:(usable_screen ()) display !state;
+        apply_layout ~screen display !state;
         update_borders display !state;
         loop ()
       in
