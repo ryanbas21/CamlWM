@@ -138,9 +138,13 @@ let x_free = foreign "XFree" (ptr void @-> returning void)
    Caller must XFree [*prop_return] when not null. *)
 let x_get_window_property =
   foreign "XGetWindowProperty"
-    (display_t @-> window_t @-> atom_t @-> long @-> long @-> bool
-     @-> atom_t @-> ptr atom_t @-> ptr int @-> ptr ulong @-> ptr ulong
-     @-> ptr (ptr uchar) @-> returning int)
+    (display_t @-> window_t @-> atom_t @-> long @-> long @-> bool @-> atom_t
+   @-> ptr atom_t @-> ptr int @-> ptr ulong @-> ptr ulong
+    @-> ptr (ptr uchar)
+    @-> returning int)
+
+let atom_atom : Unsigned.ulong = Unsigned.ULong.of_int 4
+let atom_window : Unsigned.ulong = Unsigned.ULong.of_int 33
 
 (* Built-in atom for the CARDINAL type, defined in <X11/Xatom.h> as
    XA_CARDINAL = 6. Server-allocated, never changes — no need to
@@ -149,6 +153,11 @@ let atom_cardinal : Unsigned.ulong = Unsigned.ULong.of_int 6
 
 (* XA_STRING = 31. Used for WM_CLASS, WM_NAME, and other string properties. *)
 let atom_string : Unsigned.ulong = Unsigned.ULong.of_int 31
+
+let x_change_property =
+  foreign "XChangeProperty"
+    (display_t @-> window_t @-> atom_t @-> atom_t @-> int @-> int @-> ptr char
+   @-> int @-> returning int)
 
 (* Status XSendEvent(Display *, Window, Bool propagate, long mask, XEvent*ev); *)
 let x_send_event =
@@ -171,7 +180,6 @@ let x_grab_key =
   foreign "XGrabKey"
     (display_t @-> int @-> uint @-> window_t @-> bool @-> int @-> int
    @-> returning int)
-
 
 (* ---------- Error handler ---------- *)
 

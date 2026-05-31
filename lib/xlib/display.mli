@@ -79,6 +79,33 @@ val read_wm_class : t -> window -> (string * string) option
 val read_wm_name : t -> window -> string option
 (** Read [WM_NAME] from [window]. Returns the window title or [None]. *)
 
+(** {1 EWMH property setters} *)
+
+val set_cardinal_property : t -> window -> Unsigned.ULong.t -> int list -> unit
+(** Set a format=32 CARDINAL property on [window]. *)
+
+val set_atom_property : t -> window -> Unsigned.ULong.t -> Unsigned.ULong.t list -> unit
+(** Set a format=32 ATOM property on [window]. *)
+
+val set_window_property : t -> window -> Unsigned.ULong.t -> int list -> unit
+(** Set a format=32 WINDOW property on [window]. *)
+
+val set_utf8_property : t -> window -> Unsigned.ULong.t -> string -> unit
+(** Set a UTF8_STRING property on [window]. *)
+
+(** {1 EWMH atoms}
+
+    Accessors for interned EWMH atom IDs. Pass these to the property
+    setters above. *)
+
+val atom_net_supported : t -> Unsigned.ULong.t
+val atom_net_supporting_wm_check : t -> Unsigned.ULong.t
+val atom_net_number_of_desktops : t -> Unsigned.ULong.t
+val atom_net_desktop_names : t -> Unsigned.ULong.t
+val atom_net_current_desktop : t -> Unsigned.ULong.t
+val atom_net_client_list : t -> Unsigned.ULong.t
+val atom_net_active_window : t -> Unsigned.ULong.t
+
 (** {1 Keyboard} *)
 
 val keysym_of_string : string -> int

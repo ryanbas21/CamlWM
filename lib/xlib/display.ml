@@ -20,11 +20,23 @@ type t = {
   atom_net_wm_strut : Unsigned.ulong;
   atom_wm_class : Unsigned.ulong;
   atom_wm_name : Unsigned.ulong;
+  atom_net_supported : Unsigned.ulong;
+  atom_net_supporting_wm_check : Unsigned.ulong;
+  atom_net_number_of_desktops : Unsigned.ulong;
+  atom_net_desktop_names : Unsigned.ulong;
+  atom_net_current_desktop : Unsigned.ulong;
+  atom_net_client_list : Unsigned.ulong;
+  atom_net_active_window : Unsigned.ulong;
+  atom_net_utf8_string : Unsigned.ulong;
 }
 
 (* Reserved-edge declaration a status bar (or any docked app) sets via
    _NET_WM_STRUT[_PARTIAL] so the WM can avoid tiling on top of it. *)
 type strut = { left : int; right : int; top : int; bottom : int }
+
+(* Helper: intern an atom name on a display. Wraps the verbose
+   Ffi.x_intern_atom call. *)
+let intern display name = Ffi.x_intern_atom display name false
 
 let open_default () =
   let p = Ffi.x_open_display None in
@@ -33,30 +45,81 @@ let open_default () =
   else
     let screen = Ffi.x_default_screen p in
     let event_buf = allocate_n char ~count:Ffi.xevent_buf_size in
-    let atom_wm_protocols = Ffi.x_intern_atom p "WM_PROTOCOLS" false in
-    let atom_wm_class = Ffi.x_intern_atom p "WM_CLASS" false in
-    let atom_wm_name = Ffi.x_intern_atom p "WM_NAME" false in
-    let atom_wm_delete_window = Ffi.x_intern_atom p "WM_DELETE_WINDOW" false in
-    let atom_net_wm_strut_partial =
-      Ffi.x_intern_atom p "_NET_WM_STRUT_PARTIAL" false
-    in
-    let atom_net_wm_strut = Ffi.x_intern_atom p "_NET_WM_STRUT" false in
+    let atom = intern p in
     Ok
       {
         raw = p;
         event_buf;
         screen;
-        atom_wm_protocols;
-        atom_wm_delete_window;
-        atom_net_wm_strut_partial;
-        atom_net_wm_strut;
-        atom_wm_name;
-        atom_wm_class;
+        atom_wm_protocols = atom "WM_PROTOCOLS";
+        atom_wm_delete_window = atom "WM_DELETE_WINDOW";
+        atom_net_wm_strut_partial = atom "_NET_WM_STRUT_PARTIAL";
+        atom_net_wm_strut = atom "_NET_WM_STRUT";
+        atom_wm_name = atom "WM_NAME";
+        atom_wm_class = atom "WM_CLASS";
+        atom_net_supported = atom "_NET_SUPPORTED";
+        atom_net_supporting_wm_check = atom "_NET_SUPPORTING_WM_CHECK";
+        atom_net_number_of_desktops = atom "_NET_NUMBER_OF_DESKTOPS";
+        atom_net_desktop_names = atom "_NET_DESKTOP_NAMES";
+        atom_net_current_desktop = atom "_NET_CURRENT_DESKTOP";
+        atom_net_client_list = atom "_NET_CLIENT_LIST";
+        atom_net_active_window = atom "_NET_ACTIVE_WINDOW";
+        atom_net_utf8_string = atom "UTF8_STRING";
       }
 
 let close t = ignore (Ffi.x_close_display t.raw)
 let root_window t = Unsigned.ULong.to_int (Ffi.x_root_window t.raw t.screen)
 let connection_fd t = Ffi.x_connection_number t.raw
+
+(* ---------- Property setters (EWMH) ----------
+
+   XChangeProperty expects a raw byte buffer. For format=32 properties
+   (CARDINAL, ATOM, WINDOW), Xlib reads the buffer as [long *] — 8 bytes
+   per element on 64-bit. We allocate a [long] array, fill it, and cast
+   to [char ptr] for the binding.
+
+   All three setters share the same logic; only the [type] atom differs. *)
+
+let set_property_long t ~window ~property ~prop_type values =
+  let n = List.length values in
+  let buf = allocate_n long ~count:(max 1 n) in
+  List.iteri (fun i v -> buf +@ i <-@ Signed.Long.of_int v) values;
+  let data = from_voidp char (to_voidp buf) in
+  ignore
+    (Ffi.x_change_property t.raw
+       (Unsigned.ULong.of_int window)
+       property prop_type 32 0 data n)
+
+let set_cardinal_property t window property values =
+  set_property_long t ~window ~property ~prop_type:Ffi.atom_cardinal values
+
+let set_atom_property t window property (values : Unsigned.ulong list) =
+  set_property_long t ~window ~property ~prop_type:Ffi.atom_atom
+    (List.map Unsigned.ULong.to_int values)
+
+let set_window_property t window property (windows : int list) =
+  set_property_long t ~window ~property ~prop_type:Ffi.atom_window windows
+
+(* Set a UTF8_STRING property (format=8, one byte per char).
+   Used for _NET_DESKTOP_NAMES — a list of null-separated strings. *)
+let set_utf8_property t window property str =
+  let n = String.length str in
+  let buf = allocate_n char ~count:(max 1 n) in
+  String.iteri (fun i c -> buf +@ i <-@ c) str;
+  ignore
+    (Ffi.x_change_property t.raw
+       (Unsigned.ULong.of_int window)
+       property t.atom_net_utf8_string 8 0 buf n)
+
+(* EWMH atom accessors — t is abstract in the .mli, so we expose
+   the interned atoms through functions. *)
+let atom_net_supported t = t.atom_net_supported
+let atom_net_supporting_wm_check t = t.atom_net_supporting_wm_check
+let atom_net_number_of_desktops t = t.atom_net_number_of_desktops
+let atom_net_desktop_names t = t.atom_net_desktop_names
+let atom_net_current_desktop t = t.atom_net_current_desktop
+let atom_net_client_list t = t.atom_net_client_list
+let atom_net_active_window t = t.atom_net_active_window
 
 let select_input t ~window ~mask =
   let w = Unsigned.ULong.of_int window in

@@ -168,6 +168,29 @@ scenario_directional_bindings_grabbed() {
     done
 }
 
+scenario_ewmh_properties_set() {
+    # Verify EWMH properties are set on the root window after boot.
+    # xprop reads X properties; we check that the ones we set exist.
+    local root_props
+    root_props=$(DISPLAY="$SMOKE_DISPLAY" xprop -root 2>/dev/null)
+
+    for prop in _NET_SUPPORTED _NET_NUMBER_OF_DESKTOPS _NET_DESKTOP_NAMES \
+                _NET_CURRENT_DESKTOP _NET_CLIENT_LIST _NET_ACTIVE_WINDOW; do
+        if ! echo "$root_props" | grep -q "$prop"; then
+            echo "smoke: EWMH property $prop not set on root"
+            return 1
+        fi
+    done
+
+    # _NET_NUMBER_OF_DESKTOPS should be 5 (default config has 5 tags)
+    local ndesktops
+    ndesktops=$(echo "$root_props" | grep "_NET_NUMBER_OF_DESKTOPS" | grep -o '[0-9]*$')
+    if [[ "$ndesktops" != "5" ]]; then
+        echo "smoke: _NET_NUMBER_OF_DESKTOPS = $ndesktops, expected 5"
+        return 1
+    fi
+}
+
 scenario_recompile_no_config() {
     # --recompile with no user config should exit 1 and print a message.
     # This runs outside Xephyr — it doesn't need a display.
@@ -190,6 +213,7 @@ PRE_BOOT_SCENARIOS=(
 # Scenarios that need the WM running inside Xephyr.
 SCENARIOS=(
     scenario_default_config_boots
+    scenario_ewmh_properties_set
     scenario_keypress_fires
     scenario_workspace_hide_show
     scenario_close_focused

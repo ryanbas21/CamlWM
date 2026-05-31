@@ -270,7 +270,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
           docks := window :: !docks;
           Display.map_window display window;
           state
-      | None ->
+      | None -> (
           let class_name, instance_name =
             match Display.read_wm_class display window with
             | Some (inst, cls) -> (cls, inst)
@@ -297,7 +297,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
               let state' = Stack_set.insert_up window state in
               Display.set_border_width display window config.border_width;
               Display.map_window display window;
-              state')
+              state'))
   | Unmap_notify { window } ->
       if consume_pending_unmap window then state
       else Stack_set.delete window state
@@ -326,6 +326,45 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
   | Other { event_type } ->
       log "Other event type=%d (ignored)" event_type;
       state
+
+let init_ewmh (display : Display.t) (root : int) (config : Config.t) =
+    Display.set_cardinal_property display root
+      (Display.atom_net_number_of_desktops display)
+      [ List.length config.tags ];
+    Display.set_utf8_property display root
+      (Display.atom_net_desktop_names display)
+      (String.concat "\000" config.tags ^ "\000");
+    Display.set_atom_property display root
+      (Display.atom_net_supported display)
+      [
+        Display.atom_net_supported display;
+        Display.atom_net_number_of_desktops display;
+        Display.atom_net_desktop_names display;
+        Display.atom_net_current_desktop display;
+        Display.atom_net_client_list display;
+        Display.atom_net_active_window display;
+      ]
+
+let update_ewmh display root (config : Config.t)
+    (state : Layout.t Stack_set.t) =
+  let current_idx =
+    let rec find i = function
+      | [] -> 0
+      | t :: _ when t = Stack_set.current_tag state -> i
+      | _ :: rest -> find (i + 1) rest
+    in
+    find 0 config.tags
+  in
+  Display.set_cardinal_property display root
+    (Display.atom_net_current_desktop display) [current_idx];
+  Display.set_window_property display root
+    (Display.atom_net_client_list display) (Stack_set.all_windows state);
+  let focused = match Stack_set.peek state with
+    | Some w -> [w]
+    | None -> []
+  in
+  Display.set_window_property display root
+    (Display.atom_net_active_window display) focused
 
 (* ----------------------------------------------------------------- *)
 (* Entry point                                                        *)
@@ -380,6 +419,7 @@ let run (config : Config.t) =
           : Stack_set.screen_detail)
       in
 
+      init_ewmh display root config;
       log "Entering event loop";
       let rec loop () =
         let event = Display.next_event display in
@@ -388,6 +428,7 @@ let run (config : Config.t) =
         reconcile_visibility display !state;
         apply_layout config ~screen display !state;
         update_borders config display !state;
+        update_ewmh display root config !state;
         loop ()
       in
       loop ()
