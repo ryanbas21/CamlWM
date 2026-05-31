@@ -271,10 +271,33 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
           Display.map_window display window;
           state
       | None ->
-          let state' = Stack_set.insert_up window state in
-          Display.set_border_width display window config.border_width;
-          Display.map_window display window;
-          state')
+          let class_name, instance_name =
+            match Display.read_wm_class display window with
+            | Some (inst, cls) -> (cls, inst)
+            | None -> ("", "")
+          in
+          let title =
+            match Display.read_wm_name display window with
+            | Some t -> t
+            | None -> ""
+          in
+          let props : Config.window_properties =
+            { class_name; instance_name; title }
+          in
+          match config.manage_hook props with
+          | Ignore -> state
+          | Shift_to tag ->
+              let state' = Stack_set.insert_up window state in
+              let state'' = Stack_set.shift tag state' in
+              Display.set_border_width display window config.border_width;
+              Display.map_window display window;
+              state''
+          | Tile | Float ->
+              (* Float not implemented yet — treat as Tile *)
+              let state' = Stack_set.insert_up window state in
+              Display.set_border_width display window config.border_width;
+              Display.map_window display window;
+              state')
   | Unmap_notify { window } ->
       if consume_pending_unmap window then state
       else Stack_set.delete window state

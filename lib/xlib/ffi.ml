@@ -147,6 +147,9 @@ let x_get_window_property =
    XInternAtom it. *)
 let atom_cardinal : Unsigned.ulong = Unsigned.ULong.of_int 6
 
+(* XA_STRING = 31. Used for WM_CLASS, WM_NAME, and other string properties. *)
+let atom_string : Unsigned.ulong = Unsigned.ULong.of_int 31
+
 (* Status XSendEvent(Display *, Window, Bool propagate, long mask, XEvent*ev); *)
 let x_send_event =
   foreign "XSendEvent"
@@ -168,6 +171,7 @@ let x_grab_key =
   foreign "XGrabKey"
     (display_t @-> int @-> uint @-> window_t @-> bool @-> int @-> int
    @-> returning int)
+
 
 (* ---------- Error handler ---------- *)
 

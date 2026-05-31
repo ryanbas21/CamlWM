@@ -17,6 +17,14 @@
      new workspaces and cycles through them on Mod+Space.
 *)
 
+type window_properties = {
+  class_name : string;
+  instance_name : string;
+  title : string;
+}
+
+type manage_action = Tile | Float | Ignore | Shift_to of string
+
 type t = {
   border_width : int;
   focused_color : int;
@@ -25,6 +33,7 @@ type t = {
   layouts : Layout.t list;
   tags : string list;
   bindings : Key_binding.t list;
+  manage_hook : window_properties -> manage_action;
 }
 
 let workspace_bindings =
@@ -120,4 +129,5 @@ let default =
     gap = 2;
     tags = [ "1"; "2"; "3"; "4"; "5" ];
     bindings;
+    manage_hook = (fun _prop -> Tile);
   }

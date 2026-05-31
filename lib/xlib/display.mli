@@ -72,6 +72,13 @@ val read_strut : t -> window -> strut option
     not advertise either property — i.e. it isn't a dock/bar and
     should be tiled normally. *)
 
+val read_wm_class : t -> window -> (string * string) option
+(** Read [WM_CLASS] from [window]. Returns [(instance_name, class_name)]
+    or [None] if the property is absent. *)
+
+val read_wm_name : t -> window -> string option
+(** Read [WM_NAME] from [window]. Returns the window title or [None]. *)
+
 (** {1 Keyboard} *)
 
 val keysym_of_string : string -> int

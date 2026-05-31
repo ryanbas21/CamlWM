@@ -18,6 +18,8 @@ type t = {
   atom_wm_delete_window : Unsigned.ulong;
   atom_net_wm_strut_partial : Unsigned.ulong;
   atom_net_wm_strut : Unsigned.ulong;
+  atom_wm_class : Unsigned.ulong;
+  atom_wm_name : Unsigned.ulong;
 }
 
 (* Reserved-edge declaration a status bar (or any docked app) sets via
@@ -32,16 +34,25 @@ let open_default () =
     let screen = Ffi.x_default_screen p in
     let event_buf = allocate_n char ~count:Ffi.xevent_buf_size in
     let atom_wm_protocols = Ffi.x_intern_atom p "WM_PROTOCOLS" false in
-    let atom_wm_delete_window =
-      Ffi.x_intern_atom p "WM_DELETE_WINDOW" false
-    in
+    let atom_wm_class = Ffi.x_intern_atom p "WM_CLASS" false in
+    let atom_wm_name = Ffi.x_intern_atom p "WM_NAME" false in
+    let atom_wm_delete_window = Ffi.x_intern_atom p "WM_DELETE_WINDOW" false in
     let atom_net_wm_strut_partial =
       Ffi.x_intern_atom p "_NET_WM_STRUT_PARTIAL" false
     in
     let atom_net_wm_strut = Ffi.x_intern_atom p "_NET_WM_STRUT" false in
-    Ok { raw = p; event_buf; screen;
-         atom_wm_protocols; atom_wm_delete_window;
-         atom_net_wm_strut_partial; atom_net_wm_strut }
+    Ok
+      {
+        raw = p;
+        event_buf;
+        screen;
+        atom_wm_protocols;
+        atom_wm_delete_window;
+        atom_net_wm_strut_partial;
+        atom_net_wm_strut;
+        atom_wm_name;
+        atom_wm_class;
+      }
 
 let close t = ignore (Ffi.x_close_display t.raw)
 let root_window t = Unsigned.ULong.to_int (Ffi.x_root_window t.raw t.screen)
@@ -114,29 +125,30 @@ let send_wm_delete t w =
     buf +@ i <-@ '\000'
   done;
   let set_int off v = from_voidp int (to_voidp (buf +@ off)) <-@ v in
-  let set_ulong off v =
-    from_voidp ulong (to_voidp (buf +@ off)) <-@ v
-  in
-  let set_long off v =
-    from_voidp long (to_voidp (buf +@ off)) <-@ v
-  in
-  set_int 0 33;                              (* ClientMessage *)
-  set_ulong 32 (Unsigned.ULong.of_int w);    (* window *)
-  set_ulong 40 t.atom_wm_protocols;          (* message_type *)
-  set_int 48 32;                             (* format = 32 *)
-  set_long 56                                (* data.l[0] = WM_DELETE_WINDOW *)
-    (Signed.Long.of_int
-       (Unsigned.ULong.to_int t.atom_wm_delete_window));
-  set_long 64 (Signed.Long.of_int 0);        (* data.l[1] = CurrentTime *)
+  let set_ulong off v = from_voidp ulong (to_voidp (buf +@ off)) <-@ v in
+  let set_long off v = from_voidp long (to_voidp (buf +@ off)) <-@ v in
+  set_int 0 33;
+  (* ClientMessage *)
+  set_ulong 32 (Unsigned.ULong.of_int w);
+  (* window *)
+  set_ulong 40 t.atom_wm_protocols;
+  (* message_type *)
+  set_int 48 32;
+  (* format = 32 *)
+  set_long 56 (* data.l[0] = WM_DELETE_WINDOW *)
+    (Signed.Long.of_int (Unsigned.ULong.to_int t.atom_wm_delete_window));
+  set_long 64 (Signed.Long.of_int 0);
+  (* data.l[1] = CurrentTime *)
   ignore
     (Ffi.x_send_event t.raw (Unsigned.ULong.of_int w) false
        (Signed.Long.of_int 0) buf)
 
 let close_window t w =
   let protocols = read_wm_protocols t w in
-  if List.exists
-       (fun a -> Unsigned.ULong.compare a t.atom_wm_delete_window = 0)
-       protocols
+  if
+    List.exists
+      (fun a -> Unsigned.ULong.compare a t.atom_wm_delete_window = 0)
+      protocols
   then send_wm_delete t w
   else kill_client t w
 
@@ -204,12 +216,10 @@ let read_cardinal_property t window atom ~max_count : int list option =
   let prop = allocate (ptr uchar) (from_voidp uchar null) in
   let _status =
     Ffi.x_get_window_property t.raw
-      (Unsigned.ULong.of_int window) atom
-      (Signed.Long.of_int 0)
+      (Unsigned.ULong.of_int window)
+      atom (Signed.Long.of_int 0)
       (Signed.Long.of_int max_count)
-      false
-      Ffi.atom_cardinal
-      actual_type actual_format nitems bytes_after prop
+      false Ffi.atom_cardinal actual_type actual_format nitems bytes_after prop
   in
   let n = Unsigned.ULong.to_int !@nitems in
   let format = !@actual_format in
@@ -219,13 +229,14 @@ let read_cardinal_property t window atom ~max_count : int list option =
   if (not type_ok) || n = 0 || format <> 32 then begin
     if not (is_null !@prop) then Ffi.x_free (to_voidp !@prop);
     None
-  end else begin
+  end
+  else begin
     (* Read [n] longs (8 bytes each on x86_64) out of the returned buffer. *)
     let p = !@prop in
     let longs =
       List.init n (fun i ->
-        let lp = from_voidp long (to_voidp (p +@ (i * 8))) in
-        Signed.Long.to_int !@lp)
+          let lp = from_voidp long (to_voidp (p +@ (i * 8))) in
+          Signed.Long.to_int !@lp)
     in
     Ffi.x_free (to_voidp p);
     Some longs
@@ -237,17 +248,61 @@ let read_cardinal_property t window atom ~max_count : int list option =
    "this window does not reserve any screen edge". *)
 let read_strut t window : strut option =
   let from_first4 = function
-    | left :: right :: top :: bottom :: _ ->
-        Some { left; right; top; bottom }
+    | left :: right :: top :: bottom :: _ -> Some { left; right; top; bottom }
     | _ -> None
   in
   match
     read_cardinal_property t window t.atom_net_wm_strut_partial ~max_count:12
   with
   | Some longs -> from_first4 longs
-  | None ->
-    (match
-       read_cardinal_property t window t.atom_net_wm_strut ~max_count:4
-     with
-     | Some longs -> from_first4 longs
-     | None -> None)
+  | None -> (
+      match
+        read_cardinal_property t window t.atom_net_wm_strut ~max_count:4
+      with
+      | Some longs -> from_first4 longs
+      | None -> None)
+
+let read_string_property t window atom ~max_len : string option =
+  (* Same setup as read_cardinal_property *)
+  let actual_type = allocate Ffi.atom_t (Unsigned.ULong.of_int 0) in
+  let actual_format = allocate int 0 in
+  let nitems = allocate ulong (Unsigned.ULong.of_int 0) in
+  let bytes_after = allocate ulong (Unsigned.ULong.of_int 0) in
+  let prop = allocate (ptr uchar) (from_voidp uchar null) in
+  let _status =
+    Ffi.x_get_window_property t.raw
+      (Unsigned.ULong.of_int window)
+      atom (Signed.Long.of_int 0)
+      (Signed.Long.of_int max_len)
+      false Ffi.atom_string (* <-- different: STRING not CARDINAL *) actual_type
+      actual_format nitems bytes_after prop
+  in
+  let n = Unsigned.ULong.to_int !@nitems in
+  let format = !@actual_format in
+  let returned_type = !@actual_type in
+  let type_ok = Unsigned.ULong.compare returned_type Ffi.atom_string = 0 in
+  if (not type_ok) || n = 0 || format <> 8 then begin
+    (*                              ^^^^ format=8 not 32 *)
+    if not (is_null !@prop) then Ffi.x_free (to_voidp !@prop);
+    None
+  end
+  else begin
+    (* Read n bytes into an OCaml string *)
+    let p = !@prop in
+    let s =
+      String.init n (fun i -> Char.chr (Unsigned.UChar.to_int !@(p +@ i)))
+    in
+    Ffi.x_free (to_voidp p);
+    Some s
+  end
+
+let read_wm_name t window : string option =
+  read_string_property t window t.atom_wm_name ~max_len:256
+
+let read_wm_class t window : (string * string) option =
+  match read_string_property t window t.atom_wm_class ~max_len:256 with
+  | None -> None
+  | Some s -> (
+      match String.split_on_char '\000' s with
+      | instance :: cls :: _ -> Some (instance, cls)
+      | _ -> None)
