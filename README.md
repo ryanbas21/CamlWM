@@ -118,6 +118,61 @@ WM falls back to defaults.
 
 Use `camlwm --recompile` to check your config without starting the WM.
 
+### Custom keybindings
+
+Add application launchers and custom bindings by appending to the
+default binding list:
+
+```ocaml
+open Camlwm_core
+
+let my_bindings =
+  [
+    { Key_binding.modifiers = Key_binding.mod4;
+      key = "Return"; action = Spawn [ "ghostty" ] };
+    { Key_binding.modifiers = Key_binding.mod4;
+      key = "space"; action = Spawn [ "rofi"; "-show"; "drun" ] };
+    { Key_binding.modifiers = Key_binding.mod4;
+      key = "f"; action = Spawn [ "firefox" ] };
+    { Key_binding.modifiers = Key_binding.mods [ Key_binding.mod4; Key_binding.shift ];
+      key = "x"; action = Spawn [ "loginctl"; "lock-session" ] };
+  ]
+
+let () =
+  Camlwm_wm.Wm.run
+    { Config.default with
+      bindings = my_bindings @ Config.default.bindings;
+    }
+```
+
+Bindings listed first take priority. Use `Key_binding.mods` to combine
+modifiers:
+
+| Modifier              | Value                  |
+| --------------------- | ---------------------- |
+| Super                 | `Key_binding.mod4`     |
+| Shift                 | `Key_binding.shift`    |
+| Control               | `Key_binding.control`  |
+| Alt                   | `Key_binding.mod1`     |
+| Super+Shift           | `Key_binding.mods [Key_binding.mod4; Key_binding.shift]` |
+
+Available actions: `Spawn`, `Close_focused`, `Focus_direction`,
+`Focus_next`, `Focus_prev`, `Swap_master`, `Cycle_layout`, `View`,
+`Shift`, `Shrink`, `Expand`, `Inc_master`, `Dec_master`.
+
+### Config fields
+
+| Field             | Type                                | Default          |
+| ----------------- | ----------------------------------- | ---------------- |
+| `border_width`    | `int`                               | `2`              |
+| `focused_color`   | `int` (0xRRGGBB)                    | `0x4078F2` (blue)|
+| `unfocused_color` | `int` (0xRRGGBB)                    | `0x444444` (grey)|
+| `gap`             | `int`                               | `2`              |
+| `layouts`         | `Layout.t list`                     | Tall, Wide, Full |
+| `tags`            | `string list`                       | `["1".."5"]`     |
+| `bindings`        | `Key_binding.t list`                | see Keybindings  |
+| `manage_hook`     | `window_properties -> manage_action`| `fun _ -> Tile`  |
+
 ## Contributing
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions,
