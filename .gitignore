@@ -5,3 +5,4 @@ _build/
 
 # direnv local cache (the tracked .envrc is fine to commit)
 .direnv/
+result
