@@ -79,9 +79,15 @@ wait_for_log() {
 }
 
 # Send a key combination to the nested X server.
+# --delay 50 slows down the modifier→key delivery so the X server
+# has time to process each piece. Without this, rapid Super+key
+# sequences can race and the WM sees a bare Super press instead.
+# The sleep afterwards lets the WM's event loop run before the
+# test proceeds.
 # Usage: send_key super+Return
 send_key() {
-    DISPLAY="$SMOKE_DISPLAY" xdotool key "$1"
+    DISPLAY="$SMOKE_DISPLAY" xdotool key --delay 50 "$1"
+    sleep 0.15
 }
 
 # Count visible (mapped) windows matching an X11 class.

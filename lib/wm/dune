@@ -1,0 +1,4 @@
+(library
+ (name camlwm_wm)
+ (public_name camlwm.wm)
+ (libraries camlwm_core camlwm_xlib unix))

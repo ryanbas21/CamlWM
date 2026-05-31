@@ -20,13 +20,13 @@ let result_t = Alcotest.(list (pair int rect_t))
 let test_empty () =
   Alcotest.check result_t "empty in → empty out"
     []
-    (Wide.do_layout ~screen:screen_1024 [])
+    (Wide.do_layout ~ratio:0.5 ~master_count:1 ~screen:screen_1024 [])
 
 let test_singleton () =
   let expected = [ 42, Geometry.{ x = 0; y = 0; w = 1024; h = 768 } ] in
   Alcotest.check result_t "one window fills screen"
     expected
-    (Wide.do_layout ~screen:screen_1024 [ 42 ])
+    (Wide.do_layout ~ratio:0.5 ~master_count:1 ~screen:screen_1024 [ 42 ])
 
 let test_three_windows () =
   (* 1024×768: master on top half (768/2=384), two slaves split bottom
@@ -39,7 +39,7 @@ let test_three_windows () =
     ]
   in
   Alcotest.check result_t "1 master + 2 slaves" expected
-    (Wide.do_layout ~screen:screen_1024 [ 1; 2; 3 ])
+    (Wide.do_layout ~ratio:0.5 ~master_count:1 ~screen:screen_1024 [ 1; 2; 3 ])
 
 let test_four_windows () =
   (* Three slaves: each gets 1024/3 = 341 wide. *)
@@ -53,7 +53,7 @@ let test_four_windows () =
     ]
   in
   Alcotest.check result_t "1 master + 3 slaves" expected
-    (Wide.do_layout ~screen:screen_1024 [ 10; 20; 30; 40 ])
+    (Wide.do_layout ~ratio:0.5 ~master_count:1 ~screen:screen_1024 [ 10; 20; 30; 40 ])
 
 let test_layout_value () =
   Alcotest.(check string) "exposes name" "wide" Wide.layout.name

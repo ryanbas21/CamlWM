@@ -2,13 +2,13 @@
    window is on top in the X stacking order is what the user sees.
 
    No master/slaves distinction, no math beyond "everyone gets the
-   screen". The visible window changes when focus does (since X raises
-   the focused window). *)
+   screen". [ratio] and [master_count] are accepted but ignored. *)
 
 open Stack_set
 open Geometry
 
-let do_layout ~screen:(screen_detail : screen_detail) (windows : window list) :
+let do_layout ~ratio:_ ~master_count:_
+    ~screen:(screen_detail : screen_detail) (windows : window list) :
     (window * rect) list =
   let full =
     {
@@ -20,4 +20,5 @@ let do_layout ~screen:(screen_detail : screen_detail) (windows : window list) :
   in
   List.map (fun w -> (w, full)) windows
 
-let layout : Layout.t = { name = "full"; do_layout }
+let layout : Layout.t =
+  { name = "full"; do_layout; ratio = 0.5; master_count = 1 }

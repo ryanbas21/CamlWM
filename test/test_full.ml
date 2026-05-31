@@ -22,12 +22,12 @@ let full = Geometry.{ x = 0; y = 0; w = 1024; h = 768 }
 let test_empty () =
   Alcotest.check result_t "empty in → empty out"
     []
-    (Full.do_layout ~screen:screen_1024 [])
+    (Full.do_layout ~ratio:0.5 ~master_count:1 ~screen:screen_1024 [])
 
 let test_singleton () =
   Alcotest.check result_t "one window full screen"
     [ 1, full ]
-    (Full.do_layout ~screen:screen_1024 [ 1 ])
+    (Full.do_layout ~ratio:0.5 ~master_count:1 ~screen:screen_1024 [ 1 ])
 
 let test_all_windows_get_same_rect () =
   (* Every window in the input must get the screen rect. Order is
@@ -37,7 +37,7 @@ let test_all_windows_get_same_rect () =
   let expected = List.map (fun w -> (w, full)) windows in
   Alcotest.check result_t "all windows full-screen, identical rects"
     expected
-    (Full.do_layout ~screen:screen_1024 windows)
+    (Full.do_layout ~ratio:0.5 ~master_count:1 ~screen:screen_1024 windows)
 
 let test_layout_value () =
   Alcotest.(check string) "exposes name" "full" Full.layout.name

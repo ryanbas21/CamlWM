@@ -19,6 +19,10 @@ type action =
   | View of Stack_set.workspace_tag (* switch current screen to this ws *)
   | Shift of Stack_set.workspace_tag (* send focused window to this ws *)
   | Cycle_layout (* next layout in main.ml's list *)
+  | Shrink
+  | Expand
+  | Inc_master
+  | Dec_master
 
 (* A single binding: trigger + effect. [modifiers] is the X11 modifier
    bitmask at the moment [key] is pressed — see the constants below. *)

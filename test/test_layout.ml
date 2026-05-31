@@ -10,7 +10,9 @@ let test_record_dispatches () =
   (* A layout's do_layout field is callable through the record without
      needing to know which module implemented it. *)
   let l : Layout.t = Tall.layout in
-  let rects = l.do_layout ~screen [ 1 ] in
+  let rects =
+    l.do_layout ~ratio:l.ratio ~master_count:l.master_count ~screen [ 1 ]
+  in
   Alcotest.(check int) "1 window → 1 rect" 1 (List.length rects)
 
 let test_layouts_have_distinct_names () =

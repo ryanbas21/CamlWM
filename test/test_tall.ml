@@ -30,7 +30,7 @@ let result_t = Alcotest.(list (pair int rect_t))
 let test_empty () =
   Alcotest.check result_t "empty in → empty out"
     []
-    (Tall.do_layout ~screen:screen_1024 [])
+    (Tall.do_layout ~ratio:0.5 ~master_count:1 ~screen:screen_1024 [])
 
 (* ---------- 2. single window fills screen ---------- *)
 
@@ -40,7 +40,7 @@ let test_singleton () =
   in
   Alcotest.check result_t "one window fills screen"
     expected
-    (Tall.do_layout ~screen:screen_1024 [ 42 ])
+    (Tall.do_layout ~ratio:0.5 ~master_count:1 ~screen:screen_1024 [ 42 ])
 
 (* ---------- 3. master + 2 slaves: the canonical shape ---------- *)
 
@@ -54,7 +54,7 @@ let test_three_windows () =
   in
   Alcotest.check result_t "1 master + 2 slaves"
     expected
-    (Tall.do_layout ~screen:screen_1024 [ 1; 2; 3 ])
+    (Tall.do_layout ~ratio:0.5 ~master_count:1 ~screen:screen_1024 [ 1; 2; 3 ])
 
 (* ---------- 4. master + 3 slaves: slaves split into thirds ---------- *)
 
@@ -69,7 +69,7 @@ let test_four_windows () =
   in
   Alcotest.check result_t "1 master + 3 slaves"
     expected
-    (Tall.do_layout ~screen:screen_1024 [ 10; 20; 30; 40 ])
+    (Tall.do_layout ~ratio:0.5 ~master_count:1 ~screen:screen_1024 [ 10; 20; 30; 40 ])
 
 let suite =
   [

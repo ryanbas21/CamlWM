@@ -2,4 +2,4 @@
  (name main)
  (public_name camlwm)
  (package camlwm)
- (libraries camlwm_core camlwm_xlib unix))
+ (libraries camlwm_core camlwm_wm unix))

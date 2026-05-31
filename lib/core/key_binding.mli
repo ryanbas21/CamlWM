@@ -11,6 +11,10 @@ type action =
   | View of Stack_set.workspace_tag (* workspaces *)
   | Shift of Stack_set.workspace_tag (*Mod4 +Shift1..9 *)
   | Cycle_layout
+  | Shrink
+  | Expand
+  | Inc_master
+  | Dec_master
 
 type t = { modifiers : int; key : string; action : action }
 
