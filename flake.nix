@@ -49,6 +49,29 @@
         ];
 
       in {
+        packages.default = pkgs.stdenv.mkDerivation {
+          pname = "camlwm";
+          version = "0.1.0";
+          src = ./.;
+
+          nativeBuildInputs = ocamlDeps ++ [ ocamlPackages.alcotest pkgs.pkg-config ];
+          buildInputs = [ pkgs.xorg.libX11 ];
+
+          buildPhase = ''
+            dune build
+          '';
+
+          checkPhase = ''
+            dune runtest
+          '';
+          doCheck = true;
+
+          installPhase = ''
+            install -Dm755 _build/default/bin/main.exe $out/bin/camlwm
+            dune install --prefix=$out --libdir=$out/lib/ocaml 2>/dev/null || true
+          '';
+        };
+
         devShells.default = pkgs.mkShell {
           name = "camlwm-dev";
 
