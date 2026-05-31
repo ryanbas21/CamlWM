@@ -1,0 +1,54 @@
+name: Publish to AUR
+
+on:
+  push:
+    branches: [main]
+
+# Only one publish at a time.
+concurrency:
+  group: aur-publish
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: update camlwm-git on AUR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up SSH for AUR
+        env:
+          AUR_SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$AUR_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "Host aur.archlinux.org" >> ~/.ssh/config
+          echo "  IdentityFile ~/.ssh/id_ed25519" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+
+      - name: Clone AUR repo
+        run: git clone ssh://aur@aur.archlinux.org/camlwm-git.git aur-repo
+
+      - name: Update PKGBUILD
+        run: cp PKGBUILD aur-repo/PKGBUILD
+
+      - name: Generate .SRCINFO
+        uses: docker://archlinux:latest
+        with:
+          args: bash -c "cd /github/workspace/aur-repo && makepkg --printsrcinfo > .SRCINFO"
+
+      - name: Push to AUR
+        run: |
+          cd aur-repo
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add PKGBUILD .SRCINFO
+          if git diff --cached --quiet; then
+            echo "No changes to publish"
+          else
+            git commit -m "Update to $(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD)"
+            git push
+          fi
