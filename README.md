@@ -1,5 +1,9 @@
 # camlWM
 
+<p align="center">
+  <img src="logo.jpg" alt="camlWM logo" width="200">
+</p>
+
 [![AUR](https://img.shields.io/aur/version/camlwm-git)](https://aur.archlinux.org/packages/camlwm-git)
 [![CI](https://github.com/ryanbas21/CamlWM/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanbas21/CamlWM/actions/workflows/ci.yml)
 
