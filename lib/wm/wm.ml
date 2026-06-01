@@ -386,6 +386,7 @@ let run (config : Config.t) =
       Display.install_error_handler ~on_error:(fun ~event_type ->
           log "X error: type=%d (ignored)" event_type);
 
+      Sys.set_signal Sys.sigchld (Sys.Signal_handle (fun _ -> try ignore (Unix.waitpid [Unix.WNOHANG] (-1)) with _ -> ()));
       Display.select_root_wm_events display ~window:root;
       Display.sync display ~discard:false;
       log "Selected WM events on root window %d" root;
