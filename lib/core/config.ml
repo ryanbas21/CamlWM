@@ -131,3 +131,38 @@ let default =
     bindings;
     manage_hook = (fun _prop -> Tile);
   }
+
+let bind mods tag action bindings =
+  bindings @ [ { Key_binding.modifiers = mods; key = tag; action } ]
+
+let bind_all new_bindings existing_bindings =
+  existing_bindings
+  @ List.map
+      (fun (mods, key, action) -> { Key_binding.modifiers = mods; key; action })
+      new_bindings
+
+let super = Key_binding.mod4
+let alt = Key_binding.mod1
+
+let match_class cls action =
+ fun props -> if props.class_name = cls then Some action else None
+
+let match_instance inst action =
+ fun props -> if props.instance_name = inst then Some action else None
+
+let with_mod m bindings =
+  List.map
+    (fun (key, action) -> { Key_binding.modifiers = m; key; action })
+    bindings
+
+let workspace_bindings_for mod_key =
+  List.map
+    (fun (b : Key_binding.t) ->
+      let base_mod = b.modifiers land lnot Key_binding.mod4 in
+      { b with modifiers = base_mod lor mod_key })
+    workspace_bindings
+
+let rules r props =
+  match List.find_map (fun rule -> rule props) r with
+  | Some action -> action
+  | None -> Tile

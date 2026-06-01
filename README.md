@@ -126,45 +126,92 @@ Use `camlwm --recompile` to check your config without starting the WM.
 
 ### Custom keybindings
 
-Add application launchers and custom bindings by appending to the
-default binding list:
+Use the helper functions to build bindings concisely:
 
 ```ocaml
 open Camlwm_core
 
-let my_bindings =
-  [
-    { Key_binding.modifiers = Key_binding.mod4;
-      key = "Return"; action = Spawn [ "ghostty" ] };
-    { Key_binding.modifiers = Key_binding.mod4;
-      key = "space"; action = Spawn [ "rofi"; "-show"; "drun" ] };
-    { Key_binding.modifiers = Key_binding.mod4;
-      key = "f"; action = Spawn [ "firefox" ] };
-    { Key_binding.modifiers = Key_binding.mods [ Key_binding.mod4; Key_binding.shift ];
-      key = "x"; action = Spawn [ "loginctl"; "lock-session" ] };
-  ]
+let super = Config.super
+let shift = Key_binding.shift
 
 let () =
   Camlwm_wm.Wm.run
     { Config.default with
-      bindings = my_bindings @ Config.default.bindings;
+      bindings =
+        Config.default.bindings
+        (* Add individual bindings with |> pipe *)
+        |> Config.bind super "Return" (Spawn ["ghostty"])
+        |> Config.bind super "f" (Spawn ["firefox"])
+        |> Config.bind (super lor shift) "x" (Spawn ["loginctl"; "lock-session"])
+        (* Or add many at once *)
+        |> Config.bind_all [
+          (super, "space", Spawn ["rofi"; "-show"; "drun"]);
+          (super, "b", Spawn ["polybar-msg"; "cmd"; "toggle"]);
+        ];
     }
 ```
 
-Bindings listed first take priority. Use `Key_binding.mods` to combine
-modifiers:
+**`Config.with_mod`** creates bindings that share a modifier:
 
-| Modifier              | Value                  |
-| --------------------- | ---------------------- |
-| Super                 | `Key_binding.mod4`     |
-| Shift                 | `Key_binding.shift`    |
-| Control               | `Key_binding.control`  |
-| Alt                   | `Key_binding.mod1`     |
-| Super+Shift           | `Key_binding.mods [Key_binding.mod4; Key_binding.shift]` |
+```ocaml
+Config.with_mod super [
+  ("Return", Spawn ["ghostty"]);
+  ("f", Spawn ["firefox"]);
+  ("q", Close_focused);
+]
+```
 
-Available actions: `Spawn`, `Close_focused`, `Focus_direction`,
-`Focus_next`, `Focus_prev`, `Swap_master`, `Cycle_layout`, `View`,
-`Shift`, `Shrink`, `Expand`, `Inc_master`, `Dec_master`.
+**`Config.workspace_bindings_for`** generates workspace View + Shift
+bindings for a different mod key:
+
+```ocaml
+(* Use Alt instead of Super for workspace switching *)
+{ Config.default with
+  bindings =
+    Config.with_mod Config.alt [
+      ("Return", Spawn ["ghostty"]);
+      ("space", Cycle_layout);
+    ]
+    @ Config.workspace_bindings_for Config.alt;
+}
+```
+
+### Manage hooks
+
+Use the combinators or write a plain function:
+
+```ocaml
+(* Combinator style -- first match wins, rest tile *)
+manage_hook = Config.rules [
+  Config.match_class "Gimp" Float;
+  Config.match_class "MPlayer" Float;
+  Config.match_instance "desktop_window" Ignore;
+]
+
+(* Function style -- full OCaml logic *)
+manage_hook = (fun props ->
+  if String.length props.title > 100 then Config.Float
+  else if props.class_name = "Firefox" then Config.Shift_to "2"
+  else Config.Tile
+)
+```
+
+### Modifier aliases
+
+| Alias             | Value                |
+| ----------------- | -------------------- |
+| `Config.super`    | Super / Windows key  |
+| `Config.alt`      | Alt key              |
+| `Key_binding.shift` | Shift              |
+| `Key_binding.control` | Control           |
+
+Combine with `lor`: `Config.super lor Key_binding.shift`.
+
+### Available actions
+
+`Spawn`, `Close_focused`, `Focus_direction`, `Focus_next`,
+`Focus_prev`, `Swap_master`, `Cycle_layout`, `View`, `Shift`,
+`Shrink`, `Expand`, `Inc_master`, `Dec_master`.
 
 ### Config fields
 
