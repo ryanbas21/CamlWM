@@ -36,14 +36,14 @@
         # System libraries the FFI bindings link against.
         systemLibs = with pkgs; [
           pkg-config
-          xorg.libX11
-          xorg.libX11.dev
+          libx11
+          libx11.dev
         ];
 
         # Tools for running and exercising the WM.
         runtimeTools = with pkgs; [
-          xorg.xorgserver   # provides Xephyr binary
-          xorg.xinit
+          xorgserver        # provides Xephyr binary
+          xinit
           xterm             # something to launch inside the nested X server
           xdotool           # simulate input events for smoke tests
         ];
@@ -55,7 +55,7 @@
           src = ./.;
 
           nativeBuildInputs = ocamlDeps ++ [ ocamlPackages.alcotest pkgs.pkg-config ];
-          buildInputs = [ pkgs.xorg.libX11 ];
+          buildInputs = [ pkgs.libx11 ];
 
           buildPhase = ''
             dune build
