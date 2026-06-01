@@ -191,6 +191,47 @@ scenario_ewmh_properties_set() {
     fi
 }
 
+scenario_focus_follows_mouse() {
+    # Spawn two xterms, then move the mouse into the second one.
+    # The WM should receive an Enter_notify and switch focus.
+    # We verify by checking that _NET_ACTIVE_WINDOW changes.
+    wait_for_visible_count xterm 2 5 || {
+        # Need at least 2 windows from previous scenarios
+        send_key super+Return
+        wait_for_visible_count xterm 1 5 || return 1
+        send_key super+Return
+        wait_for_visible_count xterm 2 5 || return 1
+    }
+    sleep 0.3
+
+    # Get the two xterm window IDs
+    local wids
+    wids=$(DISPLAY="$SMOKE_DISPLAY" xdotool search --onlyvisible --class xterm 2>/dev/null)
+    local wid1 wid2
+    wid1=$(echo "$wids" | head -1)
+    wid2=$(echo "$wids" | tail -1)
+    [[ -z "$wid1" || -z "$wid2" || "$wid1" = "$wid2" ]] && {
+        echo "smoke: need 2 distinct xterms"
+        return 1
+    }
+
+    # Move mouse into the second window — should trigger Enter_notify
+    DISPLAY="$SMOKE_DISPLAY" xdotool mousemove --window "$wid2" 10 10
+    sleep 0.3
+
+    # Check that _NET_ACTIVE_WINDOW changed to wid2
+    local active
+    active=$(DISPLAY="$SMOKE_DISPLAY" xprop -root _NET_ACTIVE_WINDOW 2>/dev/null \
+        | grep -o '0x[0-9a-f]*$')
+    local wid2_hex
+    wid2_hex=$(printf "0x%x" "$wid2")
+
+    if [[ "$active" != "$wid2_hex" ]]; then
+        echo "smoke: focus didn't follow mouse (active=$active, expected=$wid2_hex)"
+        return 1
+    fi
+}
+
 scenario_recompile_no_config() {
     # --recompile with no user config should exit 1 and print a message.
     # This runs outside Xephyr — it doesn't need a display.
@@ -218,6 +259,7 @@ SCENARIOS=(
     scenario_workspace_hide_show
     scenario_close_focused
     scenario_layout_cycle
+    scenario_focus_follows_mouse
     scenario_directional_bindings_grabbed
 )
 

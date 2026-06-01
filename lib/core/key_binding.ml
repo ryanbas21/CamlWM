@@ -23,6 +23,7 @@ type action =
   | Expand
   | Inc_master
   | Dec_master
+  | Quit
 
 (* A single binding: trigger + effect. [modifiers] is the X11 modifier
    bitmask at the moment [key] is pressed — see the constants below. *)

@@ -71,11 +71,12 @@ DISPLAY=:10 camlwm
 - **EWMH properties**: `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`,
   `_NET_CLIENT_LIST`, `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`,
   `_NET_SUPPORTED` -- status bars can read workspace and window state
+- **Focus follows mouse**: moving the pointer into a window focuses it
+- **Quit action**: clean WM exit via keybinding
 
 ## Missing for daily use
 
 - Floating windows
-- Focus follows mouse / click to focus
 - Mouse bindings (drag to move/resize)
 - Multi-monitor
 - Restart-in-place
@@ -211,7 +212,7 @@ Combine with `lor`: `Config.super lor Key_binding.shift`.
 
 `Spawn`, `Close_focused`, `Focus_direction`, `Focus_next`,
 `Focus_prev`, `Swap_master`, `Cycle_layout`, `View`, `Shift`,
-`Shrink`, `Expand`, `Inc_master`, `Dec_master`.
+`Shrink`, `Expand`, `Inc_master`, `Dec_master`, `Quit`.
 
 ### Config fields
 

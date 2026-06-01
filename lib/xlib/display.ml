@@ -120,6 +120,7 @@ let atom_net_desktop_names t = t.atom_net_desktop_names
 let atom_net_current_desktop t = t.atom_net_current_desktop
 let atom_net_client_list t = t.atom_net_client_list
 let atom_net_active_window t = t.atom_net_active_window
+let mask_enter_window = Ffi.Event_mask.enter_window
 
 let select_input t ~window ~mask =
   let w = Unsigned.ULong.of_int window in

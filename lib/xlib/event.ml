@@ -25,6 +25,7 @@ type t =
   | Destroy_notify of { window : window }
   | Configure_request of configure_request
   | Key_press of key_press
+  | Enter_notify of { window : window }
   | Other of { event_type : int }
 
 (* ---------- Low-level decode helpers ----------
@@ -103,4 +104,6 @@ let decode (buf : char ptr) : t =
         keycode = read_uint_at buf Offset.key_keycode;
         state = read_uint_at buf Offset.key_state;
       }
+  else if et = Ffi.Event_type.enter_notify then
+    Enter_notify { window = read_window_at buf Offset.key_window }
   else Other { event_type = et }

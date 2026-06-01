@@ -15,6 +15,7 @@ type action =
   | Expand
   | Inc_master
   | Dec_master
+  | Quit
 
 type t = { modifiers : int; key : string; action : action }
 

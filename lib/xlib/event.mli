@@ -1,19 +1,15 @@
 (** OCaml view of the XEvent union.
 
-    Phase 1 covers exactly the events a minimum-viable WM has to handle.
-    More variants and fields will land as we need them (button events,
-    property changes, client messages, ...). *)
+    Phase 1 covers exactly the events a minimum-viable WM has to handle. More
+    variants and fields will land as we need them (button events, property
+    changes, client messages, ...). *)
 
 type window = int
 
 type modifiers = int
 (** Bitmask of [Ffi.Modifier] values. *)
 
-type key_press = {
-  window : window;
-  keycode : int;
-  state : modifiers;
-}
+type key_press = { window : window; keycode : int; state : modifiers }
 
 type configure_request = {
   window : window;
@@ -30,10 +26,11 @@ type t =
   | Destroy_notify of { window : window }
   | Configure_request of configure_request
   | Key_press of key_press
+  | Enter_notify of { window : window }
   | Other of { event_type : int }
       (** Catch-all for events we haven't decoded yet. *)
 
 val decode : char Ctypes.ptr -> t
-(** Library-internal: decode a raw XEvent buffer (size
-    [Ffi.xevent_buf_size]) into a typed variant. Called by [Display].
-    Not intended for direct use outside camlwm_xlib. *)
+(** Library-internal: decode a raw XEvent buffer (size [Ffi.xevent_buf_size])
+    into a typed variant. Called by [Display]. Not intended for direct use
+    outside camlwm_xlib. *)

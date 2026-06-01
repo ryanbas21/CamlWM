@@ -105,6 +105,7 @@ let next_layout (config : Config.t) (current : Layout.t) : Layout.t =
    to push the state forward reactively. *)
 let run_action config display ~screen action (state : Layout.t Stack_set.t) =
   match action with
+  | Key_binding.Quit -> exit 0
   | Key_binding.Focus_next -> Stack_set.focus_down state
   | Key_binding.Focus_prev -> Stack_set.focus_up state
   | Key_binding.Focus_direction dir ->
@@ -264,11 +265,13 @@ let apply_layout config display ~screen (state : Layout.t Stack_set.t) =
 let handle_event (config : Config.t) display ~screen (event : Event.t)
     (state : Layout.t Stack_set.t) : Layout.t Stack_set.t =
   match event with
+  | Enter_notify { window } -> Stack_set.focus_window window state
   | Map_request { window } -> (
       match Display.read_strut display window with
       | Some _strut ->
           docks := window :: !docks;
           Display.map_window display window;
+          Display.select_input display ~window ~mask:Display.mask_enter_window;
           state
       | None -> (
           let class_name, instance_name =
@@ -291,12 +294,13 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
               let state'' = Stack_set.shift tag state' in
               Display.set_border_width display window config.border_width;
               Display.map_window display window;
+              Display.select_input display ~window ~mask:Display.mask_enter_window;
               state''
           | Tile | Float ->
-              (* Float not implemented yet — treat as Tile *)
               let state' = Stack_set.insert_up window state in
               Display.set_border_width display window config.border_width;
               Display.map_window display window;
+              Display.select_input display ~window ~mask:Display.mask_enter_window;
               state'))
   | Unmap_notify { window } ->
       if consume_pending_unmap window then state
@@ -328,25 +332,25 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
       state
 
 let init_ewmh (display : Display.t) (root : int) (config : Config.t) =
-    Display.set_cardinal_property display root
-      (Display.atom_net_number_of_desktops display)
-      [ List.length config.tags ];
-    Display.set_utf8_property display root
-      (Display.atom_net_desktop_names display)
-      (String.concat "\000" config.tags ^ "\000");
-    Display.set_atom_property display root
-      (Display.atom_net_supported display)
-      [
-        Display.atom_net_supported display;
-        Display.atom_net_number_of_desktops display;
-        Display.atom_net_desktop_names display;
-        Display.atom_net_current_desktop display;
-        Display.atom_net_client_list display;
-        Display.atom_net_active_window display;
-      ]
+  Display.set_cardinal_property display root
+    (Display.atom_net_number_of_desktops display)
+    [ List.length config.tags ];
+  Display.set_utf8_property display root
+    (Display.atom_net_desktop_names display)
+    (String.concat "\000" config.tags ^ "\000");
+  Display.set_atom_property display root
+    (Display.atom_net_supported display)
+    [
+      Display.atom_net_supported display;
+      Display.atom_net_number_of_desktops display;
+      Display.atom_net_desktop_names display;
+      Display.atom_net_current_desktop display;
+      Display.atom_net_client_list display;
+      Display.atom_net_active_window display;
+    ]
 
-let update_ewmh display root (config : Config.t)
-    (state : Layout.t Stack_set.t) =
+let update_ewmh display root (config : Config.t) (state : Layout.t Stack_set.t)
+    =
   let current_idx =
     let rec find i = function
       | [] -> 0
@@ -356,15 +360,17 @@ let update_ewmh display root (config : Config.t)
     find 0 config.tags
   in
   Display.set_cardinal_property display root
-    (Display.atom_net_current_desktop display) [current_idx];
+    (Display.atom_net_current_desktop display)
+    [ current_idx ];
   Display.set_window_property display root
-    (Display.atom_net_client_list display) (Stack_set.all_windows state);
-  let focused = match Stack_set.peek state with
-    | Some w -> [w]
-    | None -> []
+    (Display.atom_net_client_list display)
+    (Stack_set.all_windows state);
+  let focused =
+    match Stack_set.peek state with Some w -> [ w ] | None -> []
   in
   Display.set_window_property display root
-    (Display.atom_net_active_window display) focused
+    (Display.atom_net_active_window display)
+    focused
 
 (* ----------------------------------------------------------------- *)
 (* Entry point                                                        *)

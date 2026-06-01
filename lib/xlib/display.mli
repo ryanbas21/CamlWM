@@ -106,6 +106,11 @@ val atom_net_current_desktop : t -> Unsigned.ULong.t
 val atom_net_client_list : t -> Unsigned.ULong.t
 val atom_net_active_window : t -> Unsigned.ULong.t
 
+(** {1 Event masks} *)
+
+val mask_enter_window : int64
+(** Event mask for EnterNotify events. Pass to [select_input]. *)
+
 (** {1 Keyboard} *)
 
 val keysym_of_string : string -> int
