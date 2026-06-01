@@ -20,6 +20,9 @@ val connection_fd : t -> int
 (** Underlying file descriptor — handy if we want to [select] on it alongside
     other input sources. *)
 
+val screen_dimensions : t -> int * int
+(** [(width, height)] of the default screen in pixels. *)
+
 (** {1 Event loop} *)
 
 val select_input : t -> window:window -> mask:int64 -> unit

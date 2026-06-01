@@ -62,6 +62,12 @@ let x_default_screen = foreign "XDefaultScreen" (display_t @-> returning int)
 let x_root_window =
   foreign "XRootWindow" (display_t @-> int @-> returning window_t)
 
+(* int XDisplayWidth(Display *display, int screen_number); *)
+let x_display_width = foreign "XDisplayWidth" (display_t @-> int @-> returning int)
+
+(* int XDisplayHeight(Display *display, int screen_number); *)
+let x_display_height = foreign "XDisplayHeight" (display_t @-> int @-> returning int)
+
 (* int ConnectionNumber(Display *display); — actually a macro in Xlib,
    but libX11 also exposes the function form. *)
 let x_connection_number =

@@ -71,6 +71,11 @@ let close t = ignore (Ffi.x_close_display t.raw)
 let root_window t = Unsigned.ULong.to_int (Ffi.x_root_window t.raw t.screen)
 let connection_fd t = Ffi.x_connection_number t.raw
 
+let screen_dimensions t =
+  let w = Ffi.x_display_width t.raw t.screen in
+  let h = Ffi.x_display_height t.raw t.screen in
+  (w, h)
+
 (* ---------- Property setters (EWMH) ----------
 
    XChangeProperty expects a raw byte buffer. For format=32 properties

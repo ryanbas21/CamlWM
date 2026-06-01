@@ -189,10 +189,9 @@ let run_action config display ~screen action (state : Layout.t Stack_set.t) =
 (* ----------------------------------------------------------------- *)
 (* Configuration                                                      *)
 
-(* In Phase 2 we'll query the X server for real screen geometry using
-   Xinerama. For now, match Xephyr's typical default size. *)
-let screen_detail : Stack_set.screen_detail =
-  { sx = 0; sy = 0; sw = 1024; sh = 768 }
+let screen_detail_of display : Stack_set.screen_detail =
+  let sw, sh = Display.screen_dimensions display in
+  { sx = 0; sy = 0; sw; sh }
 
 let log fmt =
   Format.kasprintf
@@ -406,6 +405,7 @@ let run (config : Config.t) =
       let default_layout =
         match config.layouts with l :: _ -> l | [] -> Tall.layout
       in
+      let screen_detail = screen_detail_of display in
       let state =
         ref
         @@ Stack_set.empty ~layouts:default_layout ~tags:config.tags
