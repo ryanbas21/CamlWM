@@ -49,27 +49,21 @@
         ];
 
       in {
-        packages.default = pkgs.stdenv.mkDerivation {
+        packages.default = ocamlPackages.buildDunePackage {
           pname = "camlwm";
           version = "0.1.0";
           src = ./.;
+          duneVersion = "3";
 
-          nativeBuildInputs = ocamlDeps ++ [ ocamlPackages.alcotest pkgs.pkg-config ];
-          buildInputs = [ pkgs.libx11 ];
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = with ocamlPackages; [
+            ctypes
+            ctypes-foreign
+            pkgs.libx11
+          ];
+          checkInputs = [ ocamlPackages.alcotest ];
 
-          buildPhase = ''
-            dune build
-          '';
-
-          checkPhase = ''
-            dune runtest
-          '';
           doCheck = true;
-
-          installPhase = ''
-            install -Dm755 _build/default/bin/main.exe $out/bin/camlwm
-            dune install --prefix=$out --libdir=$out/lib/ocaml 2>/dev/null || true
-          '';
         };
 
         devShells.default = pkgs.mkShell {
