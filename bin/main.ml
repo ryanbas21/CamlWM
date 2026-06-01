@@ -15,8 +15,7 @@ let log fmt =
       flush stdout)
     fmt
 
-let has_flag flag =
-  Array.exists (fun arg -> arg = flag) Sys.argv
+let has_flag flag = Array.exists (fun arg -> arg = flag) Sys.argv
 
 let () =
   if has_flag "--recompile" then (
@@ -26,8 +25,7 @@ let () =
     else
       match Recompile.compile () with
       | Ok () ->
-          log "Compiled %s → %s" Recompile.config_source
-            Recompile.cached_binary;
+          log "Compiled %s → %s" Recompile.config_source Recompile.cached_binary;
           exit 0
       | Error msg ->
           log "Compilation failed:\n%s" msg;
