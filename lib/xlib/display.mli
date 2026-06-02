@@ -57,6 +57,9 @@ val kill_client : t -> window -> unit
     Most callers should prefer [close_window] which tries the polite
     [WM_DELETE_WINDOW] protocol first. *)
 
+val raise_window : t -> window -> unit
+(** Raise [window] to the top of the stacking order. *)
+
 val close_window : t -> window -> unit
 (** Try to close [window] politely by sending the [WM_DELETE_WINDOW]
     client message — the application can prompt-to-save, etc., before

@@ -233,6 +233,14 @@ let insert_up w t =
         | Some s -> { ws with stack = Some (insert_up_stack w s) })
       t
 
+let is_floating w t = List.mem_assoc w t.floating
+
+let float_window w rect t =
+  { t with floating = (w, rect) :: List.remove_assoc w t.floating }
+
+let sink_window w t =
+  { t with floating = List.remove_assoc w t.floating }
+
 (* Delete [w] from wherever it lives — current ws, any visible ws, any
    hidden ws, and floating. *)
 let delete w t =

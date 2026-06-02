@@ -87,6 +87,7 @@ val index : 'l t -> window list
 
 val member : window -> 'l t -> bool
 val find_tag : window -> 'l t -> workspace_tag option
+val is_floating : window -> 'l t -> bool
 
 (** {1 Focus} *)
 
@@ -108,6 +109,13 @@ val insert_up : window -> 'l t -> 'l t
 
 val delete : window -> 'l t -> 'l t
 (** Remove window from wherever it lives, including floating. *)
+
+val float_window : window -> rational_rect -> 'l t -> 'l t
+(** Add [window] to the floating layer with [rect]. If already floating,
+    updates its rect. The window stays in its workspace stack too. *)
+
+val sink_window : window -> 'l t -> 'l t
+(** Remove [window] from the floating layer. It remains in its workspace stack. *)
 
 val swap_up : 'l t -> 'l t
 val swap_down : 'l t -> 'l t

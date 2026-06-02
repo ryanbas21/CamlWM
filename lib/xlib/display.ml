@@ -190,6 +190,8 @@ let unmap_window t w =
 
 let kill_client t w = ignore (Ffi.x_kill_client t.raw (Unsigned.ULong.of_int w))
 
+let raise_window t w = ignore (Ffi.x_raise_window t.raw (Unsigned.ULong.of_int w))
+
 (* ---------- Polite close (WM_DELETE_WINDOW) ----------
 
    Workflow:

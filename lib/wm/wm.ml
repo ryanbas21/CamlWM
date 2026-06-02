@@ -306,43 +306,60 @@ let update_borders (config : Config.t) display state =
 (* Compute layout-driven geometry for every window on the current
    workspace and push it to the X server. The layout itself is a record
    stored on the workspace — see [Layout.t] and [Stack_set.workspace]. *)
-let apply_layout config display ~screen (state : Layout.t Stack_set.t) =
-  match Stack_set.peek state with
-  | Some focused when is_fullscreen focused ->
-      Display.set_border_width display focused 0;
-      let (sd : Stack_set.screen_detail) = screen in
-      Display.move_resize display ~window:focused
-        ~x:sd.sx ~y:sd.sy ~w:sd.sw ~h:sd.sh;
-      Display.send_configure_notify display ~window:focused
-        ~x:sd.sx ~y:sd.sy ~w:sd.sw ~h:sd.sh;
-      let windows =
-        List.filter (fun w -> w <> focused) (Stack_set.index state)
-      in
-      let layout = state.current.workspace.layout in
-      let rects =
-        layout.do_layout ~ratio:layout.ratio ~master_count:layout.master_count
-          ~screen windows
-      in
-      List.iter
-        (fun (window, (rect : Geometry.rect)) ->
-          let r = apply_gap config rect in
-          Display.set_border_width display window config.border_width;
-          Display.move_resize display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h;
-          Display.send_configure_notify display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h)
-        rects
-  | _ ->
-      let windows = Stack_set.index state in
-      let layout = state.current.workspace.layout in
-      let rects =
-        layout.do_layout ~ratio:layout.ratio ~master_count:layout.master_count
-          ~screen windows
-      in
-      List.iter
-        (fun (window, (rect : Geometry.rect)) ->
-          let r = apply_gap config rect in
-          Display.move_resize display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h;
-          Display.send_configure_notify display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h)
-        rects
+let apply_layout config display ~full_screen ~screen
+    (state : Layout.t Stack_set.t) =
+  let all_windows = Stack_set.index state in
+  (* Separate floating from tiled *)
+  let tiled, floating =
+    List.partition (fun w -> not (Stack_set.is_floating w state)) all_windows
+  in
+  (* Handle fullscreen: covers the entire monitor, ignoring struts *)
+  (match Stack_set.peek state with
+   | Some focused when is_fullscreen focused ->
+       Display.set_border_width display focused 0;
+       Display.move_resize display ~window:focused
+         ~x:full_screen.Stack_set.sx ~y:full_screen.sy
+         ~w:full_screen.sw ~h:full_screen.sh;
+       Display.send_configure_notify display ~window:focused
+         ~x:full_screen.sx ~y:full_screen.sy
+         ~w:full_screen.sw ~h:full_screen.sh;
+       Display.raise_window display focused
+   | _ -> ());
+  (* Tile non-floating, non-fullscreen windows *)
+  let tiled_non_fs =
+    match Stack_set.peek state with
+    | Some f when is_fullscreen f ->
+        List.filter (fun w -> w <> f) tiled
+    | _ -> tiled
+  in
+  let layout = state.current.workspace.layout in
+  let rects =
+    layout.do_layout ~ratio:layout.ratio ~master_count:layout.master_count
+      ~screen tiled_non_fs
+  in
+  List.iter
+    (fun (window, (rect : Geometry.rect)) ->
+      let r = apply_gap config rect in
+      Display.set_border_width display window config.border_width;
+      Display.move_resize display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h;
+      Display.send_configure_notify display ~window ~x:r.x ~y:r.y
+        ~w:r.w ~h:r.h)
+    rects;
+  (* Position floating windows using rational_rect relative to screen *)
+  List.iter
+    (fun w ->
+      match List.assoc_opt w state.floating with
+      | Some r ->
+          let x = screen.Stack_set.sx + int_of_float (r.rx *. float screen.sw) in
+          let y = screen.sy + int_of_float (r.ry *. float screen.sh) in
+          let fw = int_of_float (r.rw *. float screen.sw) in
+          let fh = int_of_float (r.rh *. float screen.sh) in
+          Display.set_border_width display w config.border_width;
+          Display.move_resize display ~window:w ~x ~y ~w:fw ~h:fh;
+          Display.send_configure_notify display ~window:w ~x ~y ~w:fw ~h:fh;
+          Display.raise_window display w
+      | None -> ())
+    floating
 
 (* ----------------------------------------------------------------- *)
 (* Event handling                                                     *)
@@ -355,122 +372,101 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
     (state : Layout.t Stack_set.t) : Layout.t Stack_set.t =
   match event with
   | Enter_notify { window } -> Stack_set.focus_window window state
-  | Map_request { window } -> (
+  | Map_request { window } ->
       let wtype = Display.read_window_type display window in
-      match wtype with
-      | Dock ->
-          docks := window :: !docks;
-          Display.map_window display window;
-          Hashtbl.replace mapped_windows window ();
-          Display.select_input display ~window ~mask:Display.mask_enter_window;
-          state
-      | Dialog | Splash | Utility ->
+      (* Dock windows are not managed — just map and track struts *)
+      if wtype = Dock || (wtype = Normal && Display.read_strut display window <> None) then begin
+        docks := window :: !docks;
+        Display.map_window display window;
+        Hashtbl.replace mapped_windows window ();
+        Display.select_input display ~window ~mask:Display.mask_enter_window;
+        state
+      end
+      else
+        (* Compute placement: transient > spawn_on PID > class > manage hook.
+           This runs for ALL managed windows regardless of type. *)
+        let transient_tag =
+          match Display.read_transient_for display window with
+          | Some parent -> Stack_set.find_tag parent state
+          | None -> None
+        in
+        let spawn_on_tag =
+          match Display.read_wm_pid display window with
+          | Some pid -> (
+              match Hashtbl.find_opt pending_spawn_on pid with
+              | Some tag -> Hashtbl.remove pending_spawn_on pid; Some tag
+              | None -> None)
+          | None -> None
+        in
+        let class_tag =
+          match Display.read_wm_class display window with
+          | Some (_, cls) -> (
+              match Hashtbl.find_opt pending_spawn_on_class cls with
+              | Some tag -> Hashtbl.remove pending_spawn_on_class cls; Some tag
+              | None -> None)
+          | None -> None
+        in
+        let hook_action =
+          let class_name, instance_name =
+            match Display.read_wm_class display window with
+            | Some (inst, cls) -> (cls, inst)
+            | None -> ("", "")
+          in
+          let title =
+            match Display.read_wm_name display window with
+            | Some t -> t | None -> ""
+          in
+          config.manage_hook { class_name; instance_name; title }
+        in
+        let target_tag =
+          match transient_tag with
+          | Some _ -> transient_tag
+          | None -> (match spawn_on_tag with
+            | Some _ -> spawn_on_tag
+            | None -> (match class_tag with
+              | Some _ -> class_tag
+              | None -> (match hook_action with
+                | Some (Shift_to tag) -> Some tag
+                | _ -> None)))
+        in
+        let ignored = hook_action = Some Ignore in
+        if ignored then state
+        else
+          (* Insert into stack, optionally shift to target workspace *)
           let state' = Stack_set.insert_up window state in
+          let state' = match target_tag with
+            | Some tag -> Stack_set.shift tag state'
+            | None -> state'
+          in
+          (* Float dialogs/splash/utility, or if manage hook says Float *)
+          let should_float =
+            wtype = Dialog || wtype = Splash || wtype = Utility
+            || hook_action = Some Float
+          in
+          let state' =
+            if should_float then
+              let r : Stack_set.rational_rect =
+                { rx = 0.15; ry = 0.15; rw = 0.7; rh = 0.7 }
+              in
+              Stack_set.float_window window r state'
+            else state'
+          in
+          (* Common setup for all managed windows *)
           Display.set_border_width display window config.border_width;
           Display.map_window display window;
           Hashtbl.replace mapped_windows window ();
           Display.set_wm_state display window 1;
+          let net_wm_state = Display.read_net_wm_state display window in
+          let fs_atom =
+            Unsigned.ULong.to_int
+              (Display.atom_net_wm_state_fullscreen display)
+          in
+          if List.mem fs_atom net_wm_state then
+            set_fullscreen display window;
           Display.select_input display ~window
             ~mask:Display.mask_managed_window;
+          if should_float then Display.raise_window display window;
           state'
-      | Normal -> (
-          match Display.read_strut display window with
-          | Some _strut ->
-              docks := window :: !docks;
-              Display.map_window display window;
-              Hashtbl.replace mapped_windows window ();
-              Display.select_input display ~window
-                ~mask:Display.mask_enter_window;
-              state
-          | None -> (
-              let spawn_on_tag =
-                let pid = Display.read_wm_pid display window in
-                match pid with
-                | Some a -> (
-                    let tb = pending_spawn_on in
-                    match Hashtbl.find_opt tb a with
-                    | Some x ->
-                        Hashtbl.remove tb a;
-                        Some x
-                    | None -> None)
-                | None -> None
-              in
-              let manage_window tag =
-                let state' = Stack_set.insert_up window state in
-                let state'' = Stack_set.shift tag state' in
-                Display.set_border_width display window config.border_width;
-                Display.map_window display window;
-                Hashtbl.replace mapped_windows window ();
-                Display.set_wm_state display window 1;
-                let net_wm_state = Display.read_net_wm_state display window in
-                let fs_atom =
-                  Unsigned.ULong.to_int
-                    (Display.atom_net_wm_state_fullscreen display)
-                in
-                if List.mem fs_atom net_wm_state then
-                  set_fullscreen display window;
-                Display.select_input display ~window
-                  ~mask:Display.mask_managed_window;
-                state''
-              in
-              let tile_window () =
-                let state' = Stack_set.insert_up window state in
-                Display.set_border_width display window config.border_width;
-                Display.map_window display window;
-                Hashtbl.replace mapped_windows window ();
-                Display.set_wm_state display window 1;
-                let net_wm_state = Display.read_net_wm_state display window in
-                let fs_atom =
-                  Unsigned.ULong.to_int
-                    (Display.atom_net_wm_state_fullscreen display)
-                in
-                if List.mem fs_atom net_wm_state then
-                  set_fullscreen display window;
-                Display.select_input display ~window
-                  ~mask:Display.mask_managed_window;
-                state'
-              in
-              let class_tag =
-                match Display.read_wm_class display window with
-                | Some (_, cls) -> (
-                    match Hashtbl.find_opt pending_spawn_on_class cls with
-                    | Some tag ->
-                        Hashtbl.remove pending_spawn_on_class cls;
-                        Some tag
-                    | None -> None)
-                | None -> None
-              in
-              let transient_tag =
-                match Display.read_transient_for display window with
-                | Some parent -> Stack_set.find_tag parent state
-                | None -> None
-              in
-              match transient_tag with
-              | Some tag -> manage_window tag
-              | None -> (
-                  match spawn_on_tag with
-                  | Some tag -> manage_window tag
-                  | None -> (
-                      match class_tag with
-                      | Some tag -> manage_window tag
-                      | None -> (
-                          let class_name, instance_name =
-                            match Display.read_wm_class display window with
-                            | Some (inst, cls) -> (cls, inst)
-                            | None -> ("", "")
-                          in
-                          let title =
-                            match Display.read_wm_name display window with
-                            | Some t -> t
-                            | None -> ""
-                          in
-                          let props : Config.window_properties =
-                            { class_name; instance_name; title }
-                          in
-                          match config.manage_hook props with
-                          | Some Ignore -> state
-                          | Some (Shift_to tag) -> manage_window tag
-                          | Some (Tile | Float) | None -> tile_window ()))))))
   | Unmap_notify { window } ->
       if consume_pending_unmap window then state
       else (
@@ -683,7 +679,7 @@ let run (config : Config.t) =
         let screen = usable_screen () in
         state := handle_event config display ~screen event !state;
         reconcile_visibility display !state;
-        apply_layout config ~screen display !state;
+        apply_layout config display ~full_screen:screen_detail ~screen !state;
         update_borders config display !state;
         (match Stack_set.peek !state with
          | Some w -> Display.set_input_focus display w

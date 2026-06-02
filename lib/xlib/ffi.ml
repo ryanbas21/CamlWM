@@ -112,6 +112,9 @@ let x_move_resize_window =
 let x_kill_client =
   foreign "XKillClient" (display_t @-> window_t @-> returning int)
 
+let x_raise_window =
+  foreign "XRaiseWindow" (display_t @-> window_t @-> returning int)
+
 let x_create_simple_window =
   foreign "XCreateSimpleWindow"
     (display_t @-> window_t @-> int @-> int @-> uint @-> uint @-> uint

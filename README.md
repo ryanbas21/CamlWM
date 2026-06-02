@@ -76,9 +76,10 @@ DISPLAY=:10 camlwm
 - **Strut support**: status bars reserve screen edges via `_NET_WM_STRUT_PARTIAL`
 - **EWMH/ICCCM compliance**:
   - `_NET_SUPPORTING_WM_CHECK` (panels recognise the WM)
-  - `_NET_WM_STATE_FULLSCREEN` (video players, games, screen share)
+  - `_NET_WM_STATE_FULLSCREEN` (full monitor, ignoring struts)
   - `_NET_WM_WINDOW_TYPE` classification (dock, dialog, splash, utility)
   - `WM_TRANSIENT_FOR` (dialogs placed on parent's workspace)
+  - Dialogs/splash/utility auto-float, raised above tiled windows
   - `WM_STATE` set on managed/withdrawn windows
   - `PropertyNotify` and `ClientMessage` event handling
   - `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`, `_NET_CLIENT_LIST`,
@@ -90,10 +91,10 @@ DISPLAY=:10 camlwm
 
 ## Missing / planned
 
-- Floating windows (`Config.Float` exists but isn't wired up)
-- Mouse bindings (drag to move/resize)
+- Mouse bindings (drag to move/resize floating windows)
 - Multi-monitor
 - Restart-in-place (config recompile loses window state)
+- `WM_TAKE_FOCUS` (globally-active-input clients like Java AWT)
 
 ## Keybindings
 
