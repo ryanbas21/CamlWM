@@ -94,6 +94,12 @@ type window_type = Dock | Dialog | Splash | Utility | Normal
 val read_window_type : t -> window -> window_type
 (** Read [_NET_WM_WINDOW_TYPE]. Returns [Normal] if absent. *)
 
+val read_net_wm_state : t -> window -> int list
+(** Read [_NET_WM_STATE] atom list. Returns [[]] if absent. *)
+
+val set_net_wm_state : t -> window -> int list -> unit
+(** Set [_NET_WM_STATE] on [window]. *)
+
 val set_wm_state : t -> window -> int -> unit
 (** [set_wm_state display window state] sets WM_STATE.
     NormalState = 1, WithdrawnState = 0, IconicState = 3. *)

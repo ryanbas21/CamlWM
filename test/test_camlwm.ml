@@ -6,4 +6,5 @@ let () =
       "Tall",      Test_tall.suite;
       "Wide",      Test_wide.suite;
       "Full",      Test_full.suite;
+      "Fullscreen", Test_fullscreen.suite;
     ]

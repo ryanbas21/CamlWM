@@ -479,6 +479,15 @@ let read_window_type t window : window_type =
        | Some wt -> wt
        | None -> Normal)
 
+let read_net_wm_state t window : int list =
+  match read_cardinal_property t window t.atom_net_wm_state ~max_count:16 with
+  | Some atoms -> atoms
+  | None -> []
+
+let set_net_wm_state t window atoms =
+  set_property_long t ~window ~property:t.atom_net_wm_state
+    ~prop_type:Ffi.atom_atom atoms
+
 let set_wm_state t window wm_state =
   set_property_long t ~window ~property:t.atom_wm_state
     ~prop_type:t.atom_wm_state [ wm_state; 0 ]

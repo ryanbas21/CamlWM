@@ -82,6 +82,33 @@ let consume_pending_unmap w =
       true
   | None -> false
 
+let fullscreen_windows : (Event.window, bool) Hashtbl.t = Hashtbl.create 4
+
+let is_fullscreen w = Hashtbl.mem fullscreen_windows w
+
+let set_fullscreen display w =
+  Hashtbl.replace fullscreen_windows w true;
+  Display.set_net_wm_state display w
+    [ Unsigned.ULong.to_int (Display.atom_net_wm_state_fullscreen display) ]
+
+let remove_fullscreen (config : Config.t) display w =
+  Hashtbl.remove fullscreen_windows w;
+  Display.set_net_wm_state display w [];
+  Display.set_border_width display w config.border_width
+
+let handle_wm_state_change config display w action fullscreen_atom =
+  let fs_atom =
+    Unsigned.ULong.to_int (Display.atom_net_wm_state_fullscreen display)
+  in
+  if fullscreen_atom = fs_atom then
+    match action with
+    | 1 -> set_fullscreen display w
+    | 0 -> remove_fullscreen config display w
+    | 2 ->
+        if is_fullscreen w then remove_fullscreen config display w
+        else set_fullscreen display w
+    | _ -> ()
+
 (* Bring the X server's mapped-state in line with the current Stack_set:
    windows on the current workspace get mapped, every other tracked
    window gets unmapped. Called after every state change.
@@ -259,17 +286,38 @@ let update_borders (config : Config.t) display state =
    workspace and push it to the X server. The layout itself is a record
    stored on the workspace — see [Layout.t] and [Stack_set.workspace]. *)
 let apply_layout config display ~screen (state : Layout.t Stack_set.t) =
-  let windows = Stack_set.index state in
-  let layout = state.current.workspace.layout in
-  let rects =
-    layout.do_layout ~ratio:layout.ratio ~master_count:layout.master_count
-      ~screen windows
-  in
-  List.iter
-    (fun (window, (rect : Geometry.rect)) ->
-      let r = apply_gap config rect in
-      Display.move_resize display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h)
-    rects
+  match Stack_set.peek state with
+  | Some focused when is_fullscreen focused ->
+      Display.set_border_width display focused 0;
+      let (sd : Stack_set.screen_detail) = screen in
+      Display.move_resize display ~window:focused
+        ~x:sd.sx ~y:sd.sy ~w:sd.sw ~h:sd.sh;
+      let windows =
+        List.filter (fun w -> w <> focused) (Stack_set.index state)
+      in
+      let layout = state.current.workspace.layout in
+      let rects =
+        layout.do_layout ~ratio:layout.ratio ~master_count:layout.master_count
+          ~screen windows
+      in
+      List.iter
+        (fun (window, (rect : Geometry.rect)) ->
+          let r = apply_gap config rect in
+          Display.set_border_width display window config.border_width;
+          Display.move_resize display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h)
+        rects
+  | _ ->
+      let windows = Stack_set.index state in
+      let layout = state.current.workspace.layout in
+      let rects =
+        layout.do_layout ~ratio:layout.ratio ~master_count:layout.master_count
+          ~screen windows
+      in
+      List.iter
+        (fun (window, (rect : Geometry.rect)) ->
+          let r = apply_gap config rect in
+          Display.move_resize display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h)
+        rects
 
 (* ----------------------------------------------------------------- *)
 (* Event handling                                                     *)
@@ -325,6 +373,13 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
                 Display.set_border_width display window config.border_width;
                 Display.map_window display window;
                 Display.set_wm_state display window 1;
+                let net_wm_state = Display.read_net_wm_state display window in
+                let fs_atom =
+                  Unsigned.ULong.to_int
+                    (Display.atom_net_wm_state_fullscreen display)
+                in
+                if List.mem fs_atom net_wm_state then
+                  set_fullscreen display window;
                 Display.select_input display ~window
                   ~mask:Display.mask_managed_window;
                 state''
@@ -334,6 +389,13 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
                 Display.set_border_width display window config.border_width;
                 Display.map_window display window;
                 Display.set_wm_state display window 1;
+                let net_wm_state = Display.read_net_wm_state display window in
+                let fs_atom =
+                  Unsigned.ULong.to_int
+                    (Display.atom_net_wm_state_fullscreen display)
+                in
+                if List.mem fs_atom net_wm_state then
+                  set_fullscreen display window;
                 Display.select_input display ~window
                   ~mask:Display.mask_managed_window;
                 state'
@@ -369,10 +431,12 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
   | Unmap_notify { window } ->
       if consume_pending_unmap window then state
       else (
+        Hashtbl.remove fullscreen_windows window;
         Display.set_wm_state display window 0;
         Stack_set.delete window state)
   | Destroy_notify { window } ->
       log "Destroy_notify: window=%d" window;
+      Hashtbl.remove fullscreen_windows window;
       docks := List.filter (( <> ) window) !docks;
       Stack_set.delete window state
   | Configure_request { window; _ } ->
@@ -395,8 +459,17 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
       | Some b -> run_action config display ~screen b.action state)
   | Property_notify { window = _; atom = _ } ->
       state
-  | Client_message { window = _; message_type = _; data = _ } ->
-      state
+  | Client_message { window; message_type; data } ->
+      let net_wm_state =
+        Unsigned.ULong.to_int (Display.atom_net_wm_state display)
+      in
+      if message_type = net_wm_state then (
+        match data with
+        | action :: prop1 :: _ ->
+            handle_wm_state_change config display window action prop1;
+            state
+        | _ -> state)
+      else state
   | Other { event_type } ->
       log "Other event type=%d (ignored)" event_type;
       state
