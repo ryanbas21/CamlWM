@@ -38,29 +38,32 @@ type t = {
   gap : int;
   layouts : Layout.t list;
   tags : string list;
-  bindings : Key_binding.t list;
-  manage_hook : window_properties -> manage_action;
+  bindings : Key_binding.bindings;
+  manage_hook : window_properties -> manage_action option;
   startup : startup_entry list;
   workspace_layouts : (Stack_set.workspace_tag * Layout.t) list;
 }
 
-let bindings : Key_binding.t list =
-  Key_binding.with_mod Key_binding.mod4
-    [
-      ("Return", Spawn [ "xterm"; "-fa"; "Monospace"; "-fs"; "12" ]);
-      ("j", Focus_direction Down);
-      ("k", Focus_direction Up);
-      ("h", Focus_direction Left);
-      ("l", Focus_direction Right);
-      ("space", Cycle_layout);
-      ("m", Swap_master);
-      ("q", Close_focused);
-      ("comma", Dec_master);
-      ("period", Inc_master);
-    ]
-  @ Key_binding.with_mod (Key_binding.mod4 lor Key_binding.shift)
-      [ ("h", Shrink); ("l", Expand) ]
-  @ Key_binding.workspace_bindings_for Key_binding.mod4
+let default_tags = [ "1"; "2"; "3"; "4"; "5" ]
+
+let bindings =
+  Key_binding.empty
+  |> Key_binding.with_mod Key_binding.mod4
+       [
+         ("Return", Spawn [ "xterm"; "-fa"; "Monospace"; "-fs"; "12" ]);
+         ("j", Focus_direction Down);
+         ("k", Focus_direction Up);
+         ("h", Focus_direction Left);
+         ("l", Focus_direction Right);
+         ("space", Cycle_layout);
+         ("m", Swap_master);
+         ("q", Close_focused);
+         ("comma", Dec_master);
+         ("period", Inc_master);
+       ]
+  |> Key_binding.with_mod (Key_binding.mod4 lor Key_binding.shift)
+       [ ("h", Shrink); ("l", Expand) ]
+  |> Key_binding.workspace_bindings ~mod_key:Key_binding.mod4 ~tags:default_tags
 
 let default =
   {
@@ -71,9 +74,9 @@ let default =
     unfocused_color = 0x444444;
     layouts = [ Tall.layout; Wide.layout; Full.layout ];
     gap = 2;
-    tags = [ "1"; "2"; "3"; "4"; "5" ];
+    tags = default_tags;
     bindings;
-    manage_hook = (fun _prop -> Tile);
+    manage_hook = (fun _prop -> None);
     startup = [];
     workspace_layouts = [];
   }
@@ -90,7 +93,4 @@ let match_class cls action =
 let match_instance inst action =
  fun props -> if props.instance_name = inst then Some action else None
 
-let rules r props =
-  match List.find_map (fun rule -> rule props) r with
-  | Some action -> action
-  | None -> Tile
+let rules r props = List.find_map (fun rule -> rule props) r

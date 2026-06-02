@@ -161,69 +161,67 @@ let launcher = [ "rofi"; "-show"; "drun" ]
 (* ~/.config/camlwm/config.ml *)
 open Camlwm_core
 
+let tags = [ "web"; "dev"; "chat"; "4"; "5" ]
+
 let () =
   Camlwm_wm.run
     { Config.default with
+      tags;
       bindings =
-        Key_binding.with_mod Key_binding.super [
-          ("Return", Spawn Commands.terminal);
-          ("f", Spawn Commands.browser);
-          ("space", Spawn Commands.launcher);
-        ]
-        @ Key_binding.workspace_bindings_for Key_binding.super;
+        Key_binding.empty
+        |> Key_binding.with_mod Key_binding.super
+             [ ("Return", Spawn Commands.terminal);
+               ("f", Spawn Commands.browser) ]
+        |> Key_binding.workspace_bindings
+             ~mod_key:Key_binding.super ~tags;
     }
 ```
 
 ### Custom keybindings
 
-The `Key_binding` module provides helpers to build bindings concisely:
+Bindings are stored in a `Map` keyed on `(modifiers, key)`. Inserting
+a key that already exists overrides it — composition is lawful.
+Everything is an endo (`bindings -> bindings`) and composes with `|>`:
 
 ```ocaml
-open Camlwm_core
-
 let super = Key_binding.super
 let shift = Key_binding.shift
+let tags = [ "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9" ]
 
-let () =
-  Camlwm_wm.run
-    { Config.default with
-      bindings =
-        Config.default.bindings
-        (* Add individual bindings with |> pipe *)
-        |> Key_binding.bind super "Return" (Spawn ["ghostty"])
-        |> Key_binding.bind super "f" (Spawn ["firefox"])
-        |> Key_binding.bind (super lor shift) "x" (Spawn ["loginctl"; "lock-session"])
-        (* Or add many at once *)
-        |> Key_binding.bind_all [
-          (super, "space", Spawn ["rofi"; "-show"; "drun"]);
-          (super, "b", Spawn ["polybar-msg"; "cmd"; "toggle"]);
-        ];
-    }
+let my_bindings =
+  (* Start from defaults and override the terminal *)
+  Config.default.bindings
+  |> Key_binding.bind super "Return" (Spawn ["ghostty"])
+  (* Add new bindings *)
+  |> Key_binding.bind super "f" (Spawn ["firefox"])
+  |> Key_binding.bind (super lor shift) "x" (Spawn ["loginctl"; "lock-session"])
+
+(* Or build from scratch *)
+let my_bindings =
+  Key_binding.empty
+  |> Key_binding.with_mod super
+       [ ("Return", Spawn ["ghostty"]);
+         ("q", Close_focused);
+         ("j", Focus_next);
+         ("k", Focus_prev) ]
+  |> Key_binding.with_mod (super lor shift)
+       [ ("e", Quit) ]
+  |> Key_binding.workspace_bindings ~mod_key:super ~tags
 ```
 
-**`Key_binding.with_mod`** creates bindings that share a modifier:
+**Override semantics:** `bind super "Return" (Spawn ["ghostty"])` on
+a map that already has `super+Return -> xterm` replaces it. No
+silent first-match shadowing.
+
+**`Key_binding.workspace_bindings`** derives View + Shift bindings from
+your actual `tags` — no hardcoded list:
 
 ```ocaml
-Key_binding.with_mod super [
-  ("Return", Spawn ["ghostty"]);
-  ("f", Spawn ["firefox"]);
-  ("q", Close_focused);
-]
-```
-
-**`Key_binding.workspace_bindings_for`** generates workspace View + Shift
-bindings for a different mod key:
-
-```ocaml
-(* Use Alt instead of Super for workspace switching *)
-{ Config.default with
-  bindings =
-    Key_binding.with_mod Key_binding.alt [
-      ("Return", Spawn ["ghostty"]);
-      ("space", Cycle_layout);
-    ]
-    @ Key_binding.workspace_bindings_for Key_binding.alt;
-}
+(* Use Alt for workspace switching with custom tags *)
+Key_binding.empty
+|> Key_binding.workspace_bindings
+     ~mod_key:Key_binding.alt
+     ~tags:[ "web"; "dev"; "chat" ]
 ```
 
 ### Startup programs
@@ -294,10 +292,12 @@ This gives workspace "dev" a 65% Tall split with three terminals:
 
 ### Manage hooks
 
-Use the combinators or write a plain function:
+Manage hooks return `action option` — `None` means "no opinion, let the
+next rule or the engine decide." The engine applies `Tile` as the default.
+This keeps rule sets composable:
 
 ```ocaml
-(* Combinator style -- first match wins, rest tile *)
+(* Combinator style -- first match wins, rest get None *)
 manage_hook = Config.rules [
   Config.match_class "Gimp" Float;
   Config.match_class "MPlayer" Float;
@@ -306,9 +306,19 @@ manage_hook = Config.rules [
 
 (* Function style -- full OCaml logic *)
 manage_hook = (fun props ->
-  if String.length props.title > 100 then Config.Float
-  else if props.class_name = "Firefox" then Config.Shift_to "2"
-  else Config.Tile
+  if String.length props.title > 100 then Some Config.Float
+  else if props.class_name = "Firefox" then Some (Config.Shift_to "2")
+  else None  (* engine defaults to Tile *)
+)
+
+(* Compose rule sets -- first group that matches wins *)
+let group_a = Config.rules [ Config.match_class "Gimp" Float ]
+let group_b = Config.rules [ Config.match_class "Firefox" (Shift_to "2") ]
+
+manage_hook = (fun props ->
+  match group_a props with
+  | Some _ as result -> result
+  | None -> group_b props
 )
 ```
 
@@ -339,8 +349,8 @@ Combine with `lor`: `Key_binding.super lor Key_binding.shift`.
 | `gap`             | `int`                               | `2`              |
 | `layouts`         | `Layout.t list`                     | Tall, Wide, Full |
 | `tags`            | `string list`                       | `["1".."5"]`     |
-| `bindings`        | `Key_binding.t list`                | see Keybindings  |
-| `manage_hook`     | `window_properties -> manage_action`| `fun _ -> Tile`  |
+| `bindings`        | `Key_binding.bindings`              | see Keybindings  |
+| `manage_hook`     | `window_properties -> manage_action option`| `fun _ -> None` |
 | `startup`         | `startup_entry list`                | `[]`             |
 | `workspace_layouts` | `(workspace_tag * Layout.t) list`         | `[]`     |
 

@@ -24,8 +24,8 @@ type t = {
   gap : int;
   layouts : Layout.t list;
   tags : string list;
-  bindings : Key_binding.t list;
-  manage_hook : window_properties -> manage_action;
+  bindings : Key_binding.bindings;
+  manage_hook : window_properties -> manage_action option;
   startup : startup_entry list;
   workspace_layouts : (Stack_set.workspace_tag * Layout.t) list;
   (** Per-workspace layout overrides. Tags not listed use the default.
@@ -65,4 +65,6 @@ val match_instance :
 val rules :
   (window_properties -> manage_action option) list ->
   window_properties ->
-  manage_action
+  manage_action option
+(** [rules matchers props] returns the first matching action, or [None].
+    The engine applies [Tile] as the default — rules stay composable. *)

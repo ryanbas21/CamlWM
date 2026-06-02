@@ -1,77 +1,61 @@
 (* A user-configurable mapping from "press these keys" to "do this".
-   Pure data — no X11 imports — so the binding list can be assembled
-   in [bin/main.ml] (and later in a user [config.ml]) without dragging
-   in the FFI layer. *)
+   Pure data — no X11 imports — so bindings can be assembled in a user
+   [config.ml] without dragging in the FFI layer.
+
+   Bindings are stored in a Map keyed on [(modifiers, key)] so that
+   inserting a key that already exists overrides it. This gives
+   composition lawful merge/override semantics — merging two binding
+   sets is [Bindings.union], override is just insert. *)
 
 type direction = Left | Right | Up | Down
 
-(* What a keybinding does when fired. *)
 type action =
   | Spawn of string list
-    (* Launch a process: ["xterm"], ["firefox"; "--new-window"].
-         Head is the executable, rest are argv. *)
-  | Focus_next (* Stack_set.focus_down *)
-  | Focus_prev (* Stack_set.focus_up *)
+  | Focus_next
+  | Focus_prev
   | Focus_direction of direction
-  (*Stack_set focus direction *)
-  | Close_focused (* WM_DELETE_WINDOW + fallback kill *)
-  | Swap_master (* Stack_set.swap_master *)
-  | View of Stack_set.workspace_tag (* switch current screen to this ws *)
-  | Shift of Stack_set.workspace_tag (* send focused window to this ws *)
-  | Cycle_layout (* next layout in main.ml's list *)
+  | Close_focused
+  | Swap_master
+  | View of Stack_set.workspace_tag
+  | Shift of Stack_set.workspace_tag
+  | Cycle_layout
   | Shrink
   | Expand
   | Inc_master
   | Dec_master
   | Quit
 
-(* A single binding: trigger + effect. [modifiers] is the X11 modifier
-   bitmask at the moment [key] is pressed — see the constants below. *)
-type t = { modifiers : int; key : string; action : action }
-
-(* Modifier-mask bits, taken straight from /usr/include/X11/X.h. These
-   are the values the X server sends in KeyPressEvent.state, and the
-   ones XGrabKey wants. Effectively frozen since 1987 — fine to restate
-   here rather than read at runtime. *)
-let shift = 0x01 (* Shift_L / Shift_R    *)
-let control = 0x04 (* Control_L / Control_R *)
-let mod1 = 0x08 (* Alt on most layouts  *)
-let mod4 = 0x40 (* Super / "Windows" key *)
-
-(* Combine several modifiers: [mods [mod4; shift]] = 0x41. *)
+(* Modifier-mask bits from /usr/include/X11/X.h. *)
+let shift = 0x01
+let control = 0x04
+let mod1 = 0x08
+let mod4 = 0x40
 let mods = List.fold_left ( lor ) 0
-
-(* Convenience aliases matching xmonad's common names. *)
 let super = mod4
 let alt = mod1
 
-(* --- Binding construction helpers ---------------------------------------- *)
+(* Map keyed on (modifiers, key_name). *)
+module Bindings = Map.Make (struct
+  type t = int * string
 
-let with_mod m bindings =
-  List.map (fun (key, action) -> { modifiers = m; key; action }) bindings
+  let compare = compare
+end)
 
-let bind m key action bindings =
-  bindings @ [ { modifiers = m; key; action } ]
+type bindings = action Bindings.t
 
-let bind_all new_bindings existing =
-  existing
-  @ List.map (fun (m, key, action) -> { modifiers = m; key; action }) new_bindings
+let empty = Bindings.empty
 
-(* View + Shift workspace bindings for tags "1".."9", using [mod4] as the
-   base modifier.  [workspace_bindings_for] re-maps them to a different
-   mod key. *)
-let workspace_bindings =
-  List.concat_map
-    (fun tag ->
-      [
-        { modifiers = mod4; key = tag; action = View tag };
-        { modifiers = mod4 lor shift; key = tag; action = Shift tag };
-      ])
-    [ "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9" ]
+let bind m key action bindings = Bindings.add (m, key) action bindings
 
-let workspace_bindings_for mod_key =
-  List.map
-    (fun (b : t) ->
-      let base_mod = b.modifiers land lnot mod4 in
-      { b with modifiers = base_mod lor mod_key })
-    workspace_bindings
+let with_mod m pairs bindings =
+  List.fold_left
+    (fun acc (key, action) -> Bindings.add (m, key) action acc)
+    bindings pairs
+
+let workspace_bindings ~mod_key ~tags bindings =
+  List.fold_left
+    (fun acc tag ->
+      acc
+      |> bind mod_key tag (View tag)
+      |> bind (mod_key lor shift) tag (Shift tag))
+    bindings tags

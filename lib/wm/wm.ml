@@ -468,9 +468,9 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
                             { class_name; instance_name; title }
                           in
                           match config.manage_hook props with
-                          | Ignore -> state
-                          | Shift_to tag -> manage_window tag
-                          | Tile | Float -> tile_window ()))))))
+                          | Some Ignore -> state
+                          | Some (Shift_to tag) -> manage_window tag
+                          | Some (Tile | Float) | None -> tile_window ()))))))
   | Unmap_notify { window } ->
       if consume_pending_unmap window then state
       else (
@@ -502,19 +502,25 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
       let lock_mask = 0x02 lor 0x10 in
       let clean = modifiers land lnot lock_mask in
       log "Key_press: keycode=%d modifiers=%d (clean=%d)" keycode modifiers clean;
+      (* Reverse-lookup: find the binding whose (mods, key) maps to this keycode.
+         The map is keyed on (mods, key_name) but X gives us keycode, so we
+         scan. This is O(n) like before but with correct override semantics. *)
       let matching =
-        List.find_opt
-          (fun (b : Key_binding.t) ->
-            let kc =
-              Display.keycode_of_keysym display
-                ~keysym:(Display.keysym_of_string b.key)
-            in
-            kc = keycode && b.modifiers = clean)
-          config.bindings
+        Key_binding.Bindings.fold
+          (fun (mods, key) action found ->
+            match found with
+            | Some _ -> found
+            | None ->
+                let kc =
+                  Display.keycode_of_keysym display
+                    ~keysym:(Display.keysym_of_string key)
+                in
+                if kc = keycode && mods = clean then Some action else None)
+          config.bindings None
       in
       match matching with
       | None -> state
-      | Some b -> run_action config display ~screen b.action state)
+      | Some action -> run_action config display ~screen action state)
   | Property_notify { window = _; atom = _ } ->
       state
   | Client_message { window; message_type; data } ->
@@ -614,14 +620,14 @@ let run (config : Config.t) =
       log "Selected WM events on root window %d" root;
 
       (* Grab keybindings from config *)
-      List.iter
-        (fun (binding : Key_binding.t) ->
-          let keysym = Display.keysym_of_string binding.key in
+      Key_binding.Bindings.iter
+        (fun (mods, key) _action ->
+          let keysym = Display.keysym_of_string key in
           let keycode = Display.keycode_of_keysym display ~keysym in
           List.iter
             (fun lock ->
               Display.grab_key display ~window:root ~keycode
-                ~modifiers:(binding.modifiers lor lock))
+                ~modifiers:(mods lor lock))
             lock_combos)
         config.bindings;
 
