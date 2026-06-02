@@ -310,6 +310,8 @@ let apply_layout config display ~screen (state : Layout.t Stack_set.t) =
       let (sd : Stack_set.screen_detail) = screen in
       Display.move_resize display ~window:focused
         ~x:sd.sx ~y:sd.sy ~w:sd.sw ~h:sd.sh;
+      Display.send_configure_notify display ~window:focused
+        ~x:sd.sx ~y:sd.sy ~w:sd.sw ~h:sd.sh;
       let windows =
         List.filter (fun w -> w <> focused) (Stack_set.index state)
       in
@@ -322,7 +324,8 @@ let apply_layout config display ~screen (state : Layout.t Stack_set.t) =
         (fun (window, (rect : Geometry.rect)) ->
           let r = apply_gap config rect in
           Display.set_border_width display window config.border_width;
-          Display.move_resize display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h)
+          Display.move_resize display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h;
+          Display.send_configure_notify display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h)
         rects
   | _ ->
       let windows = Stack_set.index state in
@@ -334,7 +337,8 @@ let apply_layout config display ~screen (state : Layout.t Stack_set.t) =
       List.iter
         (fun (window, (rect : Geometry.rect)) ->
           let r = apply_gap config rect in
-          Display.move_resize display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h)
+          Display.move_resize display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h;
+          Display.send_configure_notify display ~window ~x:r.x ~y:r.y ~w:r.w ~h:r.h)
         rects
 
 (* ----------------------------------------------------------------- *)
@@ -465,7 +469,18 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
       docks := List.filter (( <> ) window) !docks;
       Stack_set.delete window state
   | Configure_request { window; _ } ->
-      log "Configure_request: window=%d (ignored, layout decides)" window;
+      let layout = state.current.workspace.layout in
+      let windows = Stack_set.index state in
+      let rects =
+        layout.do_layout ~ratio:layout.ratio ~master_count:layout.master_count
+          ~screen windows
+      in
+      (match List.assoc_opt window rects with
+       | Some (rect : Geometry.rect) ->
+           let r = apply_gap config rect in
+           Display.send_configure_notify display ~window ~x:r.x ~y:r.y
+             ~w:r.w ~h:r.h
+       | None -> ());
       state
   | Key_press { keycode; state = modifiers; _ } -> (
       let lock_mask = 0x02 lor 0x10 in

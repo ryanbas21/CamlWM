@@ -63,6 +63,11 @@ val close_window : t -> window -> unit
     closing itself. Falls back to [kill_client] if the window does not
     advertise [WM_DELETE_WINDOW] in its [WM_PROTOCOLS] property. *)
 
+val send_configure_notify :
+  t -> window:window -> x:int -> y:int -> w:int -> h:int -> unit
+(** Send a synthetic ConfigureNotify to [window] with the given geometry.
+    ICCCM §4.1.5 requires this when not honoring a ConfigureRequest. *)
+
 (** {1 Properties} *)
 
 type strut = { left : int; right : int; top : int; bottom : int }

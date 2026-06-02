@@ -259,6 +259,30 @@ let close_window t w =
   then send_wm_delete t w
   else kill_client t w
 
+let send_configure_notify t ~window ~x ~y ~w ~h =
+  let buf = allocate_n char ~count:Ffi.xevent_buf_size in
+  for i = 0 to Ffi.xevent_buf_size - 1 do
+    buf +@ i <-@ '\000'
+  done;
+  let set_int off v = from_voidp int (to_voidp (buf +@ off)) <-@ v in
+  let set_ulong off v = from_voidp ulong (to_voidp (buf +@ off)) <-@ v in
+  set_int 0 22;
+  set_ulong 32 (Unsigned.ULong.of_int window);
+  set_ulong 40 (Unsigned.ULong.of_int window);
+  set_int 48 x;
+  set_int 52 y;
+  set_int 56 w;
+  set_int 60 h;
+  set_int 64 0;
+  set_ulong 72 (Unsigned.ULong.of_int 0);
+  set_int 80 0;
+  ignore
+    (Ffi.x_send_event t.raw (Unsigned.ULong.of_int window) false
+       (Signed.Long.of_int64
+          (Int64.logor Ffi.Event_mask.structure_notify
+             Ffi.Event_mask.substructure_notify))
+       buf)
+
 let move_resize t ~window ~x ~y ~w ~h =
   ignore
     (Ffi.x_move_resize_window t.raw
