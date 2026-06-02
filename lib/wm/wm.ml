@@ -618,6 +618,9 @@ let run (config : Config.t) =
         reconcile_visibility display !state;
         apply_layout config ~screen display !state;
         update_borders config display !state;
+        (match Stack_set.peek !state with
+         | Some w -> Display.set_input_focus display w
+         | None -> Display.set_input_focus display root);
         update_ewmh display root config !state;
         loop ()
       in

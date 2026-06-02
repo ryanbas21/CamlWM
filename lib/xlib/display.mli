@@ -178,3 +178,6 @@ val set_border_color : t -> window -> int -> unit
 val create_window :
   t -> parent:window -> x:int -> y:int -> w:int -> h:int -> window
 (** Create a simple child window. Used for EWMH check windows. *)
+
+val set_input_focus : t -> window -> unit
+(** Set X11 keyboard input focus to [window] with RevertToPointerRoot. *)

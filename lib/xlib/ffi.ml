@@ -117,6 +117,10 @@ let x_create_simple_window =
     (display_t @-> window_t @-> int @-> int @-> uint @-> uint @-> uint
    @-> ulong @-> ulong @-> returning window_t)
 
+let x_set_input_focus =
+  foreign "XSetInputFocus"
+    (display_t @-> window_t @-> int @-> long @-> returning int)
+
 (* ---------- Atoms, properties, client messages ---------- *)
 
 (* Atom XInternAtom(Display *display, const char *name, Bool only_if_exists);

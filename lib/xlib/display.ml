@@ -315,6 +315,13 @@ let create_window t ~parent ~x ~y ~w ~h =
        (Unsigned.ULong.of_int 0)
        (Unsigned.ULong.of_int 0))
 
+let set_input_focus t window =
+  ignore
+    (Ffi.x_set_input_focus t.raw
+       (Unsigned.ULong.of_int window)
+       1 (* RevertToPointerRoot *)
+       (Signed.Long.of_int 0) (* CurrentTime *))
+
 (* ---------- Properties (CARDINAL arrays) ----------
 
    Reading X11 properties via [XGetWindowProperty] is unwieldy: 6 output
