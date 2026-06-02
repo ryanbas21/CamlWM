@@ -130,30 +130,24 @@ camlwm/
 - Keybinding helpers in `Key_binding` module (`with_mod`, `bind`,
   `bind_all`, `workspace_bindings_for`, `super`, `alt`)
 - Strut support (`_NET_WM_STRUT_PARTIAL` for status bars)
-- EWMH basics: `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`,
-  `_NET_CLIENT_LIST`, `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`,
-  `_NET_SUPPORTED`
+- EWMH/ICCCM compliance:
+  - `_NET_SUPPORTING_WM_CHECK` (panels recognise the WM)
+  - `_NET_WM_STATE_FULLSCREEN` (video players, games, screen share)
+  - `_NET_WM_WINDOW_TYPE` classification (dock, dialog, splash, utility)
+  - `WM_TRANSIENT_FOR` (dialogs placed on parent workspace)
+  - `WM_STATE` on managed/withdrawn windows
+  - `PropertyNotify` and `ClientMessage` event handling
+  - `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`, `_NET_CLIENT_LIST`,
+    `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`, `_NET_SUPPORTED`
 - Focus follows mouse (`Enter_notify`)
 - Zombie child reaping (`SIGCHLD` handler)
 - Lock-modifier handling (NumLock/CapsLock combos on key grabs)
 
-**Daily-driver blockers** -- needed before switching from i3/xmonad:
-
-- [ ] `_NET_SUPPORTING_WM_CHECK` on root (polybar/panels won't
-      fully recognise the WM without it)
-- [ ] `_NET_WM_STATE_FULLSCREEN` (video players, games, screen share)
-- [ ] `WM_TRANSIENT_FOR` (dialogs stay above parent, file pickers)
-- [ ] `property_notify` listening (react to fullscreen requests,
-      title changes, urgency after map)
-- [ ] `_NET_WM_WINDOW_TYPE` reading (auto-classify dialog/splash/dock
-      so they don't get force-tiled)
-- [ ] `WM_STATE` on managed windows (some apps expect it)
-
-**Phase 5 -- EWMH polish & floating**
-- Set `_NET_WM_DESKTOP` per window
-- Handle `_NET_WM_STATE` changes (maximized, demands-attention)
+**Phase 5 -- floating & EWMH polish**
 - Wire up the existing `Config.Float` / `Stack_set.floating` path
 - Auto-float windows by `_NET_WM_WINDOW_TYPE` (dialog, splash, utility)
+- Set `_NET_WM_DESKTOP` per window
+- Handle `_NET_WM_STATE` changes (maximized, demands-attention)
 
 **Phase 6 -- mouse bindings**
 - Decode `ButtonPress` / `ButtonRelease` / `MotionNotify`

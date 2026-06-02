@@ -11,9 +11,9 @@ A minimal tiling window manager for X11, written in OCaml. Modelled
 closely on [xmonad](https://xmonad.org/): pure-functional core,
 compiled configuration, no built-in status bar.
 
-> **Status: early development.** Functional on a single monitor but not
-> yet daily-drivable. See [what works](#what-works) and
-> [what's missing](#missing-for-daily-use).
+> **Status: approaching daily-drivable.** Functional on a single monitor
+> with EWMH compliance. See [what works](#what-works) and
+> [what's planned](#missing--planned).
 
 ## Install
 
@@ -74,26 +74,22 @@ DISPLAY=:10 camlwm
   multi-file support (split config into modules, dependencies resolved
   automatically)
 - **Strut support**: status bars reserve screen edges via `_NET_WM_STRUT_PARTIAL`
-- **EWMH properties**: `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`,
-  `_NET_CLIENT_LIST`, `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`,
-  `_NET_SUPPORTED` -- status bars can read workspace and window state
+- **EWMH/ICCCM compliance**:
+  - `_NET_SUPPORTING_WM_CHECK` (panels recognise the WM)
+  - `_NET_WM_STATE_FULLSCREEN` (video players, games, screen share)
+  - `_NET_WM_WINDOW_TYPE` classification (dock, dialog, splash, utility)
+  - `WM_TRANSIENT_FOR` (dialogs placed on parent's workspace)
+  - `WM_STATE` set on managed/withdrawn windows
+  - `PropertyNotify` and `ClientMessage` event handling
+  - `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`, `_NET_CLIENT_LIST`,
+    `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`, `_NET_SUPPORTED`
 - **Focus follows mouse**: moving the pointer into a window focuses it
 - **Lock-modifier handling**: keybindings work regardless of NumLock/CapsLock state
 - **Zombie reaping**: child processes cleaned up via `SIGCHLD` handler
 - **Quit action**: clean WM exit via keybinding
 
-## Missing for daily use
+## Missing / planned
 
-**Blocking** -- needed before daily-driving:
-- `_NET_SUPPORTING_WM_CHECK` not set (panels won't fully detect the WM)
-- No fullscreen support (`_NET_WM_STATE_FULLSCREEN`)
-- `WM_TRANSIENT_FOR` not read (dialogs don't stay above parent)
-- No `property_notify` listening (can't react to fullscreen requests,
-  title changes, urgency)
-- `_NET_WM_WINDOW_TYPE` not read (dialogs, splash screens force-tiled)
-- `WM_STATE` not set on managed windows
-
-**Not yet blocking:**
 - Floating windows (`Config.Float` exists but isn't wired up)
 - Mouse bindings (drag to move/resize)
 - Multi-monitor
