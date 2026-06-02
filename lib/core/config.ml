@@ -27,8 +27,6 @@ type manage_action = Tile | Float | Ignore | Shift_to of string
 
 type startup_entry = { tag : Stack_set.workspace_tag; cmd : string list }
 
-type workspace_layout = { ratio : float; master_count : int }
-
 type t = {
   border_width : int;
   focused_color : int;
@@ -39,7 +37,7 @@ type t = {
   bindings : Key_binding.t list;
   manage_hook : window_properties -> manage_action;
   startup : startup_entry list;
-  workspace_layouts : (Stack_set.workspace_tag * workspace_layout) list;
+  workspace_layouts : (Stack_set.workspace_tag * Layout.t) list;
 }
 
 let bindings : Key_binding.t list =

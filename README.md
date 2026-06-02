@@ -249,15 +249,16 @@ startup. Each entry is one-shot — the window is placed by matching
 
 ### Per-workspace layout
 
-Set the initial split ratio and master count per workspace with
-`workspace_layouts`. Tags not listed use the defaults (ratio=0.5,
-master_count=1).
+Set the initial layout, split ratio, and master count per workspace
+with `workspace_layouts`. Each entry is a `(tag, Layout.t)` pair.
+Tags not listed use the default layout.
 
 ```ocaml
 { Config.default with
   workspace_layouts = [
-    ("dev", { ratio = 0.65; master_count = 1 });
-    ("chat", { ratio = 0.75; master_count = 1 });
+    ("dev", { Tall.layout with ratio = 0.65 });
+    ("chat", Full.layout);
+    ("media", { Wide.layout with ratio = 0.75 });
   ];
 }
 ```
@@ -268,7 +269,7 @@ at startup:
 ```ocaml
 { Config.default with
   workspace_layouts = [
-    ("dev", { ratio = 0.65; master_count = 1 });
+    ("dev", { Tall.layout with ratio = 0.65 });
   ];
   startup =
     []
@@ -279,7 +280,7 @@ at startup:
 }
 ```
 
-This gives workspace "dev" a 65% master split with three terminals:
+This gives workspace "dev" a 65% Tall split with three terminals:
 
 ```
 ┌──────────────────┬──────────┐
@@ -341,7 +342,7 @@ Combine with `lor`: `Key_binding.super lor Key_binding.shift`.
 | `bindings`        | `Key_binding.t list`                | see Keybindings  |
 | `manage_hook`     | `window_properties -> manage_action`| `fun _ -> Tile`  |
 | `startup`         | `startup_entry list`                | `[]`             |
-| `workspace_layouts` | `(workspace_tag * workspace_layout) list` | `[]`     |
+| `workspace_layouts` | `(workspace_tag * Layout.t) list`         | `[]`     |
 
 ## Contributing
 

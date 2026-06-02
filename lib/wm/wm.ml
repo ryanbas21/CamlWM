@@ -455,29 +455,15 @@ let run (config : Config.t) =
         Stack_set.empty ~layouts:default_layout ~tags:config.tags
           ~screens:[ screen_detail ]
       in
-      (* Apply per-workspace layout overrides from config.workspace_layouts.
-         For each (tag, { ratio; master_count }), switch to that workspace,
-         modify its layout, then switch back.
-
-         TODO: implement this.
-         Use [Stack_set.view] to switch to the tag, [Stack_set.modify_layout]
-         to update ratio and master_count on the layout, then
-         [Stack_set.view] to switch back to the original tag.
-
-         [Stack_set.current_tag state] gives you the tag to return to.
-         [config.workspace_layouts] is the list of [(tag, workspace_layout)] pairs.
-
-         The layout transform should look like:
-           fun (l : Layout.t) -> { l with ratio = wl.ratio; master_count = wl.master_count }
-      *)
+      (* Apply per-workspace layout overrides. For each (tag, layout),
+         switch to that workspace, replace its layout, then switch back. *)
       let state =
         let original_tag = Stack_set.current_tag initial_state in
         let with_overrides =
           List.fold_left
-            (fun s (tag, (wl : Config.workspace_layout)) ->
+            (fun s (tag, layout) ->
               s |> Stack_set.view tag
-              |> Stack_set.modify_layout (fun (l : Layout.t) ->
-                  { l with ratio = wl.ratio; master_count = wl.master_count }))
+              |> Stack_set.modify_layout (fun _ -> layout))
             initial_state config.workspace_layouts
         in
         ref (Stack_set.view original_tag with_overrides)
