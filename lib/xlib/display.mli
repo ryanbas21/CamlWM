@@ -86,6 +86,9 @@ val read_wm_pid : t -> window -> int option
 (** Read [_NET_WM_PID] from [window]. Returns the process ID that created
     the window, or [None] if the property is absent. *)
 
+val read_transient_for : t -> window -> window option
+(** Read [WM_TRANSIENT_FOR]. Returns the parent window or [None]. *)
+
 type window_type = Dock | Dialog | Splash | Utility | Normal
 
 val read_window_type : t -> window -> window_type

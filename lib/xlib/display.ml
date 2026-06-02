@@ -430,6 +430,32 @@ let read_wm_pid t window : int option =
   | Some [ pid ] -> Some pid
   | _ -> None
 
+let read_transient_for t window : int option =
+  let actual_type = allocate Ffi.atom_t (Unsigned.ULong.of_int 0) in
+  let actual_format = allocate int 0 in
+  let nitems = allocate ulong (Unsigned.ULong.of_int 0) in
+  let bytes_after = allocate ulong (Unsigned.ULong.of_int 0) in
+  let prop = allocate (ptr uchar) (from_voidp uchar null) in
+  let _status =
+    Ffi.x_get_window_property t.raw
+      (Unsigned.ULong.of_int window)
+      t.atom_wm_transient_for (Signed.Long.of_int 0)
+      (Signed.Long.of_int 1)
+      false Ffi.atom_window actual_type actual_format nitems bytes_after prop
+  in
+  let n = Unsigned.ULong.to_int !@nitems in
+  let format = !@actual_format in
+  if n = 0 || format <> 32 then begin
+    if not (is_null !@prop) then Ffi.x_free (to_voidp !@prop);
+    None
+  end
+  else begin
+    let p = !@prop in
+    let parent = Signed.Long.to_int !@(from_voidp long (to_voidp p)) in
+    Ffi.x_free (to_voidp p);
+    if parent = 0 then None else Some parent
+  end
+
 type window_type = Dock | Dialog | Splash | Utility | Normal
 
 let read_window_type t window : window_type =

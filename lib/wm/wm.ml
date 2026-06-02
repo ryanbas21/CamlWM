@@ -338,9 +338,17 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
                   ~mask:Display.mask_managed_window;
                 state'
               in
-              match spawn_on_tag with
+              let transient_tag =
+                match Display.read_transient_for display window with
+                | Some parent -> Stack_set.find_tag parent state
+                | None -> None
+              in
+              match transient_tag with
               | Some tag -> manage_window tag
               | None -> (
+                  match spawn_on_tag with
+                  | Some tag -> manage_window tag
+                  | None -> (
                   let class_name, instance_name =
                     match Display.read_wm_class display window with
                     | Some (inst, cls) -> (cls, inst)
@@ -357,7 +365,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
                   match config.manage_hook props with
                   | Ignore -> state
                   | Shift_to tag -> manage_window tag
-                  | Tile | Float -> tile_window ()))))
+                  | Tile | Float -> tile_window ())))))
   | Unmap_notify { window } ->
       if consume_pending_unmap window then state
       else (
