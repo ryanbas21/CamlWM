@@ -84,18 +84,18 @@ DISPLAY=:10 camlwm
 
 ## Missing for daily use
 
-**EWMH/ICCCM gaps** -- apps and panels may misbehave:
-- `_NET_SUPPORTING_WM_CHECK` not set (some panels won't detect the WM)
-- `_NET_WM_WINDOW_TYPE` not read (docks, dialogs, splash screens treated as normal tiles)
-- `_NET_WM_STATE` not handled (no fullscreen, no maximise)
-- `WM_TRANSIENT_FOR` not read (dialogs don't stay above their parent)
-- No `property_notify` listening (can't react to title changes, state requests, or urgency)
+**Blocking** -- needed before daily-driving:
+- `_NET_SUPPORTING_WM_CHECK` not set (panels won't fully detect the WM)
+- No fullscreen support (`_NET_WM_STATE_FULLSCREEN`)
+- `WM_TRANSIENT_FOR` not read (dialogs don't stay above parent)
+- No `property_notify` listening (can't react to fullscreen requests,
+  title changes, urgency)
+- `_NET_WM_WINDOW_TYPE` not read (dialogs, splash screens force-tiled)
+- `WM_STATE` not set on managed windows
 
-**Floating & mouse:**
+**Not yet blocking:**
 - Floating windows (`Config.Float` exists but isn't wired up)
 - Mouse bindings (drag to move/resize)
-
-**Infrastructure:**
 - Multi-monitor
 - Restart-in-place (config recompile loses window state)
 

@@ -117,12 +117,18 @@ camlwm/
 **Done**
 - Three layouts (Tall, Wide, Full) with per-workspace state
 - Configurable master area (split ratio, master count)
+- Per-workspace layout overrides (ratio, master count per tag)
 - 9 workspaces with View / Shift bindings
 - Directional focus (left/right/above/below by center-point distance)
 - Polite close (`WM_DELETE_WINDOW` with kill fallback)
 - Manage hooks (per-window rules by `WM_CLASS` / `WM_NAME`)
+- Spawn on workspace (`spawn_on` with `_NET_WM_PID` matching)
 - Compiled configuration (xmonad-style `~/.config/camlwm/config.ml`)
-- Multi-file configs (all `.ml`/`.mli` in config dir compiled together via `ocamldep`)
+- Multi-file configs (all `.ml`/`.mli` in config dir compiled together
+  via `ocamldep`; build artifacts in `build/` subdirectory)
+- `Camlwm_wm.run` (re-exported, no more `Camlwm_wm.Wm.run`)
+- Keybinding helpers in `Key_binding` module (`with_mod`, `bind`,
+  `bind_all`, `workspace_bindings_for`, `super`, `alt`)
 - Strut support (`_NET_WM_STRUT_PARTIAL` for status bars)
 - EWMH basics: `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`,
   `_NET_CLIENT_LIST`, `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`,
@@ -130,30 +136,36 @@ camlwm/
 - Focus follows mouse (`Enter_notify`)
 - Zombie child reaping (`SIGCHLD` handler)
 - Lock-modifier handling (NumLock/CapsLock combos on key grabs)
-- Spawn on workspace (`spawn_on` with `_NET_WM_PID` matching)
-- Per-workspace layout overrides (ratio, master count per tag)
 
-**Phase 4 -- EWMH/ICCCM compliance** (next)
-- Set `_NET_SUPPORTING_WM_CHECK` on root (panels won't recognise the WM without it)
-- Read `_NET_WM_WINDOW_TYPE` and auto-classify dock/dialog/splash/toolbar
-- Handle `_NET_WM_STATE` changes (fullscreen, maximized, demands-attention)
-- Read `WM_TRANSIENT_FOR` so dialogs stay above their parent
-- Listen for `property_notify` events (title changes, state requests, urgency)
-- Set `WM_STATE` on managed windows
+**Daily-driver blockers** -- needed before switching from i3/xmonad:
+
+- [ ] `_NET_SUPPORTING_WM_CHECK` on root (polybar/panels won't
+      fully recognise the WM without it)
+- [ ] `_NET_WM_STATE_FULLSCREEN` (video players, games, screen share)
+- [ ] `WM_TRANSIENT_FOR` (dialogs stay above parent, file pickers)
+- [ ] `property_notify` listening (react to fullscreen requests,
+      title changes, urgency after map)
+- [ ] `_NET_WM_WINDOW_TYPE` reading (auto-classify dialog/splash/dock
+      so they don't get force-tiled)
+- [ ] `WM_STATE` on managed windows (some apps expect it)
+
+**Phase 5 -- EWMH polish & floating**
 - Set `_NET_WM_DESKTOP` per window
-
-**Phase 5 -- floating layer & mouse**
+- Handle `_NET_WM_STATE` changes (maximized, demands-attention)
 - Wire up the existing `Config.Float` / `Stack_set.floating` path
 - Auto-float windows by `_NET_WM_WINDOW_TYPE` (dialog, splash, utility)
-- Mouse bindings: decode `ButtonPress` / `ButtonRelease` / `MotionNotify`
+
+**Phase 6 -- mouse bindings**
+- Decode `ButtonPress` / `ButtonRelease` / `MotionNotify`
 - Drag to move and drag to resize floating windows
 - Keyboard move/resize for floating windows
 
-**Phase 6 -- multi-monitor & restart**
-- Multi-monitor via Xinerama (Stack_set already has the multi-screen structure)
+**Phase 7 -- multi-monitor & restart**
+- Multi-monitor via Xinerama (Stack_set already has the multi-screen
+  structure)
 - XRandR hot-plug detection
-- Restart-in-place with state serialisation (workspace assignments, layout
-  ratios, master counts)
+- Restart-in-place with state serialisation (workspace assignments,
+  layout ratios, master counts)
 
 **Later**
 - More layouts (Mirror combinator, Spiral, Tabbed)
