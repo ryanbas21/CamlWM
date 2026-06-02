@@ -7,4 +7,5 @@ let () =
       "Wide",      Test_wide.suite;
       "Full",      Test_full.suite;
       "Fullscreen", Test_fullscreen.suite;
+      "Keybinding", Test_keybinding.suite;
     ]

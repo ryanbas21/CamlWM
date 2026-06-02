@@ -443,7 +443,9 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
       log "Configure_request: window=%d (ignored, layout decides)" window;
       state
   | Key_press { keycode; state = modifiers; _ } -> (
-      log "Key_press: keycode=%d modifiers=%d" keycode modifiers;
+      let lock_mask = 0x02 lor 0x10 in
+      let clean = modifiers land lnot lock_mask in
+      log "Key_press: keycode=%d modifiers=%d (clean=%d)" keycode modifiers clean;
       let matching =
         List.find_opt
           (fun (b : Key_binding.t) ->
@@ -451,7 +453,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
               Display.keycode_of_keysym display
                 ~keysym:(Display.keysym_of_string b.key)
             in
-            kc = keycode && b.modifiers = modifiers)
+            kc = keycode && b.modifiers = clean)
           config.bindings
       in
       match matching with
