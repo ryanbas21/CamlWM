@@ -29,6 +29,17 @@ type t = {
   atom_net_active_window : Unsigned.ulong;
   atom_net_utf8_string : Unsigned.ulong;
   atom_net_wm_pid : Unsigned.ulong;
+  atom_net_wm_state : Unsigned.ulong;
+  atom_net_wm_state_fullscreen : Unsigned.ulong;
+  atom_net_wm_window_type : Unsigned.ulong;
+  atom_net_wm_window_type_dialog : Unsigned.ulong;
+  atom_net_wm_window_type_splash : Unsigned.ulong;
+  atom_net_wm_window_type_utility : Unsigned.ulong;
+  atom_net_wm_window_type_dock : Unsigned.ulong;
+  atom_net_wm_window_type_normal : Unsigned.ulong;
+  atom_wm_transient_for : Unsigned.ulong;
+  atom_wm_state : Unsigned.ulong;
+  atom_net_wm_name : Unsigned.ulong;
 }
 
 (* Reserved-edge declaration a status bar (or any docked app) sets via
@@ -67,6 +78,17 @@ let open_default () =
         atom_net_active_window = atom "_NET_ACTIVE_WINDOW";
         atom_net_utf8_string = atom "UTF8_STRING";
         atom_net_wm_pid = atom "_NET_WM_PID";
+        atom_net_wm_state = atom "_NET_WM_STATE";
+        atom_net_wm_state_fullscreen = atom "_NET_WM_STATE_FULLSCREEN";
+        atom_net_wm_window_type = atom "_NET_WM_WINDOW_TYPE";
+        atom_net_wm_window_type_dialog = atom "_NET_WM_WINDOW_TYPE_DIALOG";
+        atom_net_wm_window_type_splash = atom "_NET_WM_WINDOW_TYPE_SPLASH";
+        atom_net_wm_window_type_utility = atom "_NET_WM_WINDOW_TYPE_UTILITY";
+        atom_net_wm_window_type_dock = atom "_NET_WM_WINDOW_TYPE_DOCK";
+        atom_net_wm_window_type_normal = atom "_NET_WM_WINDOW_TYPE_NORMAL";
+        atom_wm_transient_for = atom "WM_TRANSIENT_FOR";
+        atom_wm_state = atom "WM_STATE";
+        atom_net_wm_name = atom "_NET_WM_NAME";
       }
 
 let close t = ignore (Ffi.x_close_display t.raw)
@@ -127,6 +149,17 @@ let atom_net_desktop_names t = t.atom_net_desktop_names
 let atom_net_current_desktop t = t.atom_net_current_desktop
 let atom_net_client_list t = t.atom_net_client_list
 let atom_net_active_window t = t.atom_net_active_window
+let atom_net_wm_state t = t.atom_net_wm_state
+let atom_net_wm_state_fullscreen t = t.atom_net_wm_state_fullscreen
+let atom_net_wm_window_type t = t.atom_net_wm_window_type
+let atom_net_wm_window_type_dialog t = t.atom_net_wm_window_type_dialog
+let atom_net_wm_window_type_splash t = t.atom_net_wm_window_type_splash
+let atom_net_wm_window_type_utility t = t.atom_net_wm_window_type_utility
+let atom_net_wm_window_type_dock t = t.atom_net_wm_window_type_dock
+let atom_net_wm_window_type_normal t = t.atom_net_wm_window_type_normal
+let atom_wm_transient_for t = t.atom_wm_transient_for
+let atom_wm_state t = t.atom_wm_state
+let atom_net_wm_name t = t.atom_net_wm_name
 let mask_enter_window = Ffi.Event_mask.enter_window
 
 let select_input t ~window ~mask =
@@ -267,6 +300,17 @@ let set_border_color t w color =
   ignore
     (Ffi.x_set_window_border t.raw (Unsigned.ULong.of_int w)
        (Unsigned.ULong.of_int color))
+
+let create_window t ~parent ~x ~y ~w ~h =
+  Unsigned.ULong.to_int
+    (Ffi.x_create_simple_window t.raw
+       (Unsigned.ULong.of_int parent)
+       x y
+       (Unsigned.UInt.of_int w)
+       (Unsigned.UInt.of_int h)
+       (Unsigned.UInt.of_int 0)
+       (Unsigned.ULong.of_int 0)
+       (Unsigned.ULong.of_int 0))
 
 (* ---------- Properties (CARDINAL arrays) ----------
 

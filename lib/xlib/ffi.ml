@@ -112,6 +112,11 @@ let x_move_resize_window =
 let x_kill_client =
   foreign "XKillClient" (display_t @-> window_t @-> returning int)
 
+let x_create_simple_window =
+  foreign "XCreateSimpleWindow"
+    (display_t @-> window_t @-> int @-> int @-> uint @-> uint @-> uint
+   @-> ulong @-> ulong @-> returning window_t)
+
 (* ---------- Atoms, properties, client messages ---------- *)
 
 (* Atom XInternAtom(Display *display, const char *name, Bool only_if_exists);

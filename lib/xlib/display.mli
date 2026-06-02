@@ -112,6 +112,17 @@ val atom_net_desktop_names : t -> Unsigned.ULong.t
 val atom_net_current_desktop : t -> Unsigned.ULong.t
 val atom_net_client_list : t -> Unsigned.ULong.t
 val atom_net_active_window : t -> Unsigned.ULong.t
+val atom_net_wm_state : t -> Unsigned.ULong.t
+val atom_net_wm_state_fullscreen : t -> Unsigned.ULong.t
+val atom_net_wm_window_type : t -> Unsigned.ULong.t
+val atom_net_wm_window_type_dialog : t -> Unsigned.ULong.t
+val atom_net_wm_window_type_splash : t -> Unsigned.ULong.t
+val atom_net_wm_window_type_utility : t -> Unsigned.ULong.t
+val atom_net_wm_window_type_dock : t -> Unsigned.ULong.t
+val atom_net_wm_window_type_normal : t -> Unsigned.ULong.t
+val atom_wm_transient_for : t -> Unsigned.ULong.t
+val atom_wm_state : t -> Unsigned.ULong.t
+val atom_net_wm_name : t -> Unsigned.ULong.t
 
 (** {1 Event masks} *)
 
@@ -142,3 +153,7 @@ val set_border_width : t -> window -> int -> unit
 val set_border_color : t -> window -> int -> unit
 (** [color] is a raw pixel value. On TrueColor visuals (universal on modern X),
     it's packed 0xRRGGBB. *)
+
+val create_window :
+  t -> parent:window -> x:int -> y:int -> w:int -> h:int -> window
+(** Create a simple child window. Used for EWMH check windows. *)
