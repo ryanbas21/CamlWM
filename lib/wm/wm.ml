@@ -96,6 +96,15 @@ let remove_fullscreen (config : Config.t) display w =
   Display.set_net_wm_state display w [];
   Display.set_border_width display w config.border_width
 
+(* Track which windows the WM has mapped on the X server. This makes
+   reconcile_visibility edge-triggered: we only unmap windows that are
+   currently mapped but should be hidden, and only map windows that are
+   hidden but should be visible. Without this, reconcile bumps the
+   pending_unmaps counter on every iteration for already-hidden windows,
+   causing the counter to grow unboundedly and genuine unmaps to be
+   swallowed (ghost windows). *)
+let mapped_windows : (Event.window, unit) Hashtbl.t = Hashtbl.create 32
+
 let handle_wm_state_change config display w action fullscreen_atom =
   let fs_atom =
     Unsigned.ULong.to_int (Display.atom_net_wm_state_fullscreen display)
@@ -123,11 +132,20 @@ let reconcile_visibility display state =
   let visible = Stack_set.index state in
   let all = Stack_set.all_windows state in
   let hidden = List.filter (fun w -> not (List.mem w visible)) all in
-  List.iter (Display.map_window display) visible;
   List.iter
-    (fun x ->
-      note_pending_unmaps x;
-      Display.unmap_window display x)
+    (fun w ->
+      if not (Hashtbl.mem mapped_windows w) then begin
+        Display.map_window display w;
+        Hashtbl.replace mapped_windows w ()
+      end)
+    visible;
+  List.iter
+    (fun w ->
+      if Hashtbl.mem mapped_windows w then begin
+        note_pending_unmaps w;
+        Display.unmap_window display w;
+        Hashtbl.remove mapped_windows w
+      end)
     hidden
 
 (* Given the current layout, return the next one in [config.layouts] (wrap).
@@ -336,12 +354,14 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
       | Dock ->
           docks := window :: !docks;
           Display.map_window display window;
+          Hashtbl.replace mapped_windows window ();
           Display.select_input display ~window ~mask:Display.mask_enter_window;
           state
       | Dialog | Splash | Utility ->
           let state' = Stack_set.insert_up window state in
           Display.set_border_width display window config.border_width;
           Display.map_window display window;
+          Hashtbl.replace mapped_windows window ();
           Display.set_wm_state display window 1;
           Display.select_input display ~window
             ~mask:Display.mask_managed_window;
@@ -351,6 +371,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
           | Some _strut ->
               docks := window :: !docks;
               Display.map_window display window;
+              Hashtbl.replace mapped_windows window ();
               Display.select_input display ~window
                 ~mask:Display.mask_enter_window;
               state
@@ -372,6 +393,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
                 let state'' = Stack_set.shift tag state' in
                 Display.set_border_width display window config.border_width;
                 Display.map_window display window;
+                Hashtbl.replace mapped_windows window ();
                 Display.set_wm_state display window 1;
                 let net_wm_state = Display.read_net_wm_state display window in
                 let fs_atom =
@@ -388,6 +410,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
                 let state' = Stack_set.insert_up window state in
                 Display.set_border_width display window config.border_width;
                 Display.map_window display window;
+                Hashtbl.replace mapped_windows window ();
                 Display.set_wm_state display window 1;
                 let net_wm_state = Display.read_net_wm_state display window in
                 let fs_atom =
@@ -431,11 +454,13 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
   | Unmap_notify { window } ->
       if consume_pending_unmap window then state
       else (
+        Hashtbl.remove mapped_windows window;
         Hashtbl.remove fullscreen_windows window;
         Display.set_wm_state display window 0;
         Stack_set.delete window state)
   | Destroy_notify { window } ->
       log "Destroy_notify: window=%d" window;
+      Hashtbl.remove mapped_windows window;
       Hashtbl.remove fullscreen_windows window;
       docks := List.filter (( <> ) window) !docks;
       Stack_set.delete window state
