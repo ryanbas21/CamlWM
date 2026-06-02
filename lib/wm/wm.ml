@@ -382,15 +382,32 @@ let init_ewmh (display : Display.t) (root : int) (config : Config.t) =
   Display.set_utf8_property display root
     (Display.atom_net_desktop_names display)
     (String.concat "\000" config.tags ^ "\000");
+  (* EWMH §1.2: create a child window, point root and child at it *)
+  let check_win =
+    Display.create_window display ~parent:root ~x:(-1) ~y:(-1) ~w:1 ~h:1
+  in
+  Display.set_window_property display root
+    (Display.atom_net_supporting_wm_check display)
+    [ check_win ];
+  Display.set_window_property display check_win
+    (Display.atom_net_supporting_wm_check display)
+    [ check_win ];
+  Display.set_utf8_property display check_win
+    (Display.atom_net_wm_name display)
+    "camlwm";
   Display.set_atom_property display root
     (Display.atom_net_supported display)
     [
       Display.atom_net_supported display;
+      Display.atom_net_supporting_wm_check display;
       Display.atom_net_number_of_desktops display;
       Display.atom_net_desktop_names display;
       Display.atom_net_current_desktop display;
       Display.atom_net_client_list display;
       Display.atom_net_active_window display;
+      Display.atom_net_wm_state display;
+      Display.atom_net_wm_state_fullscreen display;
+      Display.atom_net_wm_window_type display;
     ]
 
 let update_ewmh display root (config : Config.t) (state : Layout.t Stack_set.t)
