@@ -117,7 +117,7 @@ camlwm/
 **Done**
 - Three layouts (Tall, Wide, Full) with per-workspace state
 - Configurable master area (split ratio, master count)
-- Per-workspace layout overrides (ratio, master count per tag)
+- Per-workspace layout overrides (layout type, ratio, master count per tag)
 - 9 workspaces with View / Shift bindings
 - Directional focus (left/right/above/below by center-point distance)
 - Polite close (`WM_DELETE_WINDOW` with kill fallback)
