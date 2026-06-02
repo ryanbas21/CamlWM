@@ -69,6 +69,7 @@ DISPLAY=:10 camlwm
 - **Manage hooks**: per-window rules based on `WM_CLASS` / `WM_NAME`
 - **Spawn on workspace**: launch apps on specific workspaces at startup
   via `_NET_WM_PID` matching
+- **Per-workspace layout**: set initial split ratio and master count per tag
 - **Compiled configuration**: xmonad-style `~/.config/camlwm/config.ml` with
   multi-file support (split config into modules, dependencies resolved
   automatically)
@@ -246,6 +247,50 @@ startup. Each entry is one-shot — the window is placed by matching
 }
 ```
 
+### Per-workspace layout
+
+Set the initial split ratio and master count per workspace with
+`workspace_layouts`. Tags not listed use the defaults (ratio=0.5,
+master_count=1).
+
+```ocaml
+{ Config.default with
+  workspace_layouts = [
+    ("dev", { ratio = 0.65; master_count = 1 });
+    ("chat", { ratio = 0.75; master_count = 1 });
+  ];
+}
+```
+
+Combined with `spawn_on`, you can set up complete workspace layouts
+at startup:
+
+```ocaml
+{ Config.default with
+  workspace_layouts = [
+    ("dev", { ratio = 0.65; master_count = 1 });
+  ];
+  startup =
+    []
+    |> Config.spawn_on "dev" [ "ghostty" ]
+    |> Config.spawn_on "dev" [ "ghostty" ]
+    |> Config.spawn_on "dev" [ "ghostty" ]
+    |> Config.spawn_on "web" [ "firefox" ];
+}
+```
+
+This gives workspace "dev" a 65% master split with three terminals:
+
+```
+┌──────────────────┬──────────┐
+│                  │ ghostty  │
+│    ghostty       ├──────────┤
+│    (master)      │ ghostty  │
+│                  │          │
+└──────────────────┴──────────┘
+         65%           35%
+```
+
 ### Manage hooks
 
 Use the combinators or write a plain function:
@@ -296,6 +341,7 @@ Combine with `lor`: `Key_binding.super lor Key_binding.shift`.
 | `bindings`        | `Key_binding.t list`                | see Keybindings  |
 | `manage_hook`     | `window_properties -> manage_action`| `fun _ -> Tile`  |
 | `startup`         | `startup_entry list`                | `[]`             |
+| `workspace_layouts` | `(workspace_tag * workspace_layout) list` | `[]`     |
 
 ## Contributing
 

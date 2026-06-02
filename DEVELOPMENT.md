@@ -131,6 +131,7 @@ camlwm/
 - Zombie child reaping (`SIGCHLD` handler)
 - Lock-modifier handling (NumLock/CapsLock combos on key grabs)
 - Spawn on workspace (`spawn_on` with `_NET_WM_PID` matching)
+- Per-workspace layout overrides (ratio, master count per tag)
 
 **Phase 4 -- EWMH/ICCCM compliance** (next)
 - Set `_NET_SUPPORTING_WM_CHECK` on root (panels won't recognise the WM without it)
