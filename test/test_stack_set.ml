@@ -250,6 +250,15 @@ let test_shift_without_focused_window () =
   let s = make_empty [ "1"; "2" ] |> S.shift "2" in
   Alcotest.(check (option int)) "nothing focused, no-op" None (S.peek s)
 
+let test_shift_unknown_tag () =
+  let s = S.empty ~layouts:() ~tags:["1";"2";"3"] ~screens:[screen_1024] in
+  let s = S.insert_up 100 s in
+  let s' = S.shift "nonexistent" s in
+  Alcotest.(check bool) "window still tracked"
+    true (S.member 100 s');
+  Alcotest.(check (option string)) "window still on original ws"
+    (Some "1") (S.find_tag 100 s')
+
 (* ----------------------------------------------------------------- *)
 (* 7. Layout                                                          *)
 
@@ -308,6 +317,7 @@ let suite =
     ("shift moves window", `Quick, test_shift_moves_window);
     ("shift to current is noop", `Quick, test_shift_to_current_is_noop);
     ("shift without focused", `Quick, test_shift_without_focused_window);
+    ("shift unknown tag", `Quick, test_shift_unknown_tag);
     (* Layout *)
     ("modify_layout changes current only", `Quick,
      test_modify_layout_changes_current_only);

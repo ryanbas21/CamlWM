@@ -334,8 +334,13 @@ let shift tag t =
   | Some w ->
       if tag = current_tag t then t (* already there *)
       else
-        let t' = delete w t in
-        insert_into_workspace tag w t'
+        let has_tag =
+          List.exists (fun ws -> ws.tag = tag) (all_workspaces t)
+        in
+        if not has_tag then t
+        else
+          let t' = delete w t in
+          insert_into_workspace tag w t'
 
 (* Bring focus to [w], possibly switching workspaces first. *)
 let focus_window w t =
