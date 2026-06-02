@@ -162,6 +162,9 @@ let atom_wm_state t = t.atom_wm_state
 let atom_net_wm_name t = t.atom_net_wm_name
 let mask_enter_window = Ffi.Event_mask.enter_window
 
+let mask_managed_window =
+  Int64.logor Ffi.Event_mask.enter_window Ffi.Event_mask.property_change
+
 let select_input t ~window ~mask =
   let w = Unsigned.ULong.of_int window in
   let m = Signed.Long.of_int64 mask in

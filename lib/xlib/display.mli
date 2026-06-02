@@ -129,6 +129,9 @@ val atom_net_wm_name : t -> Unsigned.ULong.t
 val mask_enter_window : int64
 (** Event mask for EnterNotify events. Pass to [select_input]. *)
 
+val mask_managed_window : int64
+(** Event mask for managed windows: EnterNotify + PropertyNotify. *)
+
 (** {1 Keyboard} *)
 
 val keysym_of_string : string -> int

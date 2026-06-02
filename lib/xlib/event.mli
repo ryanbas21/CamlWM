@@ -27,6 +27,8 @@ type t =
   | Configure_request of configure_request
   | Key_press of key_press
   | Enter_notify of { window : window }
+  | Property_notify of { window : window; atom : int }
+  | Client_message of { window : window; message_type : int; data : int list }
   | Other of { event_type : int }
       (** Catch-all for events we haven't decoded yet. *)
 

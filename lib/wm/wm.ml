@@ -312,14 +312,14 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
             let state'' = Stack_set.shift tag state' in
             Display.set_border_width display window config.border_width;
             Display.map_window display window;
-            Display.select_input display ~window ~mask:Display.mask_enter_window;
+            Display.select_input display ~window ~mask:Display.mask_managed_window;
             state''
           in
           let tile_window () =
             let state' = Stack_set.insert_up window state in
             Display.set_border_width display window config.border_width;
             Display.map_window display window;
-            Display.select_input display ~window ~mask:Display.mask_enter_window;
+            Display.select_input display ~window ~mask:Display.mask_managed_window;
             state'
           in
           match spawn_on_tag with
@@ -367,6 +367,10 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
       match matching with
       | None -> state
       | Some b -> run_action config display ~screen b.action state)
+  | Property_notify { window = _; atom = _ } ->
+      state
+  | Client_message { window = _; message_type = _; data = _ } ->
+      state
   | Other { event_type } ->
       log "Other event type=%d (ignored)" event_type;
       state

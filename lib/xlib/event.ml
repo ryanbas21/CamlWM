@@ -26,6 +26,8 @@ type t =
   | Configure_request of configure_request
   | Key_press of key_press
   | Enter_notify of { window : window }
+  | Property_notify of { window : window; atom : int }
+  | Client_message of { window : window; message_type : int; data : int list }
   | Other of { event_type : int }
 
 (* ---------- Low-level decode helpers ----------
@@ -53,6 +55,9 @@ let read_uint_at buf offset =
 let read_window_at buf offset =
   Unsigned.ULong.to_int !@(from_voidp ulong (to_voidp (buf +@ offset)))
 
+let read_long_at buf offset =
+  Signed.Long.to_int !@(from_voidp long (to_voidp (buf +@ offset)))
+
 (* Per-type offsets, verified against Xlib.h on x86_64. *)
 module Offset = struct
   let event_type = 0
@@ -77,6 +82,18 @@ module Offset = struct
   let key_window = 32
   let key_state = 80
   let key_keycode = 84
+
+  (* XPropertyEvent:
+       window at 32, atom at 40 (Atom = ulong) *)
+  let prop_window = 32
+  let prop_atom = 40
+
+  (* XClientMessageEvent:
+       window at 32, message_type at 40, format at 48, data.l at 56 *)
+  let cm_window = 32
+  let cm_message_type = 40
+  let _cm_format = 48
+  let cm_data = 56
 end
 
 let decode (buf : char ptr) : t =
@@ -106,4 +123,19 @@ let decode (buf : char ptr) : t =
       }
   else if et = Ffi.Event_type.enter_notify then
     Enter_notify { window = read_window_at buf Offset.key_window }
+  else if et = Ffi.Event_type.property_notify then
+    Property_notify
+      {
+        window = read_window_at buf Offset.prop_window;
+        atom = read_window_at buf Offset.prop_atom;
+      }
+  else if et = Ffi.Event_type.client_message then
+    Client_message
+      {
+        window = read_window_at buf Offset.cm_window;
+        message_type = read_window_at buf Offset.cm_message_type;
+        data =
+          List.init 5 (fun i ->
+              read_long_at buf (Offset.cm_data + (i * 8)));
+      }
   else Other { event_type = et }
