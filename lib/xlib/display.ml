@@ -429,3 +429,7 @@ let read_wm_pid t window : int option =
   match read_cardinal_property t window t.atom_net_wm_pid ~max_count:1 with
   | Some [ pid ] -> Some pid
   | _ -> None
+
+let set_wm_state t window wm_state =
+  set_property_long t ~window ~property:t.atom_wm_state
+    ~prop_type:t.atom_wm_state [ wm_state; 0 ]

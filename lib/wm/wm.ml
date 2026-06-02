@@ -312,6 +312,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
             let state'' = Stack_set.shift tag state' in
             Display.set_border_width display window config.border_width;
             Display.map_window display window;
+            Display.set_wm_state display window 1;
             Display.select_input display ~window ~mask:Display.mask_managed_window;
             state''
           in
@@ -319,6 +320,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
             let state' = Stack_set.insert_up window state in
             Display.set_border_width display window config.border_width;
             Display.map_window display window;
+            Display.set_wm_state display window 1;
             Display.select_input display ~window ~mask:Display.mask_managed_window;
             state'
           in
@@ -344,7 +346,9 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
               | Tile | Float -> tile_window ())))
   | Unmap_notify { window } ->
       if consume_pending_unmap window then state
-      else Stack_set.delete window state
+      else (
+        Display.set_wm_state display window 0;
+        Stack_set.delete window state)
   | Destroy_notify { window } ->
       log "Destroy_notify: window=%d" window;
       docks := List.filter (( <> ) window) !docks;
