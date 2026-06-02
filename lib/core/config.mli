@@ -11,7 +11,11 @@ type window_properties = {
 
 type manage_action = Tile | Float | Ignore | Shift_to of string
 
-type startup_entry = { tag : Stack_set.workspace_tag; cmd : string list }
+type startup_entry = {
+  tag : Stack_set.workspace_tag;
+  cmd : string list;
+  match_class : string option;
+}
 
 type t = {
   border_width : int;
@@ -36,6 +40,16 @@ val spawn_on :
   Stack_set.workspace_tag -> string list -> startup_entry list -> startup_entry list
 (** [spawn_on tag cmd entries] appends a startup entry. Pipeable:
     [[] |> spawn_on "dev" ["ghostty"] |> spawn_on "web" ["firefox"]]. *)
+
+val spawn_on_class :
+  Stack_set.workspace_tag ->
+  wm_class:string ->
+  string list ->
+  startup_entry list ->
+  startup_entry list
+(** Like [spawn_on] but matches by WM_CLASS instead of PID.
+    Use for single-instance apps like Firefox:
+    [[] |> spawn_on_class "web" ~wm_class:"firefox" ["firefox"]]. *)
 
 (** {1 Manage hook helpers} *)
 

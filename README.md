@@ -232,6 +232,10 @@ Use `Config.spawn_on` to launch programs on specific workspaces at
 startup. Each entry is one-shot — the window is placed by matching
 `_NET_WM_PID`, then the rule is consumed.
 
+For single-instance apps (Firefox, some terminal emulators in
+single-instance mode), use `Config.spawn_on_class` which matches by
+`WM_CLASS` instead of PID:
+
 ```ocaml
 { Config.default with
   startup =
@@ -239,7 +243,7 @@ startup. Each entry is one-shot — the window is placed by matching
     |> Config.spawn_on "dev" [ "ghostty" ]
     |> Config.spawn_on "dev" [ "ghostty" ]
     |> Config.spawn_on "dev" [ "ghostty" ]
-    |> Config.spawn_on "web" [ "firefox" ];
+    |> Config.spawn_on_class "web" ~wm_class:"firefox" [ "firefox" ];
 }
 ```
 

@@ -25,7 +25,11 @@ type window_properties = {
 
 type manage_action = Tile | Float | Ignore | Shift_to of string
 
-type startup_entry = { tag : Stack_set.workspace_tag; cmd : string list }
+type startup_entry = {
+  tag : Stack_set.workspace_tag;
+  cmd : string list;
+  match_class : string option;
+}
 
 type t = {
   border_width : int;
@@ -74,7 +78,11 @@ let default =
     workspace_layouts = [];
   }
 
-let spawn_on tag cmd entries = entries @ [{ tag; cmd }]
+let spawn_on tag cmd entries =
+  entries @ [{ tag; cmd; match_class = None }]
+
+let spawn_on_class tag ~wm_class cmd entries =
+  entries @ [{ tag; cmd; match_class = Some wm_class }]
 
 let match_class cls action =
  fun props -> if props.class_name = cls then Some action else None

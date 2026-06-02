@@ -56,6 +56,9 @@ let lock_combos =
 let pending_spawn_on : (int, Stack_set.workspace_tag) Hashtbl.t =
   Hashtbl.create 16
 
+let pending_spawn_on_class : (string, Stack_set.workspace_tag) Hashtbl.t =
+  Hashtbl.create 4
+
 (* Spawn a command and register its PID for workspace placement. *)
 let spawn_and_track tag cmd =
   match Unix.fork () with
@@ -427,6 +430,16 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
                   ~mask:Display.mask_managed_window;
                 state'
               in
+              let class_tag =
+                match Display.read_wm_class display window with
+                | Some (_, cls) -> (
+                    match Hashtbl.find_opt pending_spawn_on_class cls with
+                    | Some tag ->
+                        Hashtbl.remove pending_spawn_on_class cls;
+                        Some tag
+                    | None -> None)
+                | None -> None
+              in
               let transient_tag =
                 match Display.read_transient_for display window with
                 | Some parent -> Stack_set.find_tag parent state
@@ -438,23 +451,26 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
                   match spawn_on_tag with
                   | Some tag -> manage_window tag
                   | None -> (
-                  let class_name, instance_name =
-                    match Display.read_wm_class display window with
-                    | Some (inst, cls) -> (cls, inst)
-                    | None -> ("", "")
-                  in
-                  let title =
-                    match Display.read_wm_name display window with
-                    | Some t -> t
-                    | None -> ""
-                  in
-                  let props : Config.window_properties =
-                    { class_name; instance_name; title }
-                  in
-                  match config.manage_hook props with
-                  | Ignore -> state
-                  | Shift_to tag -> manage_window tag
-                  | Tile | Float -> tile_window ())))))
+                      match class_tag with
+                      | Some tag -> manage_window tag
+                      | None -> (
+                          let class_name, instance_name =
+                            match Display.read_wm_class display window with
+                            | Some (inst, cls) -> (cls, inst)
+                            | None -> ("", "")
+                          in
+                          let title =
+                            match Display.read_wm_name display window with
+                            | Some t -> t
+                            | None -> ""
+                          in
+                          let props : Config.window_properties =
+                            { class_name; instance_name; title }
+                          in
+                          match config.manage_hook props with
+                          | Ignore -> state
+                          | Shift_to tag -> manage_window tag
+                          | Tile | Float -> tile_window ()))))))
   | Unmap_notify { window } ->
       if consume_pending_unmap window then state
       else (
@@ -649,6 +665,9 @@ let run (config : Config.t) =
       (* Spawn startup entries and track their PIDs *)
       List.iter
         (fun (entry : Config.startup_entry) ->
+          (match entry.match_class with
+           | Some cls -> Hashtbl.replace pending_spawn_on_class cls entry.tag
+           | None -> ());
           spawn_and_track entry.tag entry.cmd)
         config.startup;
 
