@@ -86,6 +86,11 @@ val read_wm_pid : t -> window -> int option
 (** Read [_NET_WM_PID] from [window]. Returns the process ID that created
     the window, or [None] if the property is absent. *)
 
+type window_type = Dock | Dialog | Splash | Utility | Normal
+
+val read_window_type : t -> window -> window_type
+(** Read [_NET_WM_WINDOW_TYPE]. Returns [Normal] if absent. *)
+
 val set_wm_state : t -> window -> int -> unit
 (** [set_wm_state display window state] sets WM_STATE.
     NormalState = 1, WithdrawnState = 0, IconicState = 3. *)

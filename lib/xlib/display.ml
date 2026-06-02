@@ -430,6 +430,29 @@ let read_wm_pid t window : int option =
   | Some [ pid ] -> Some pid
   | _ -> None
 
+type window_type = Dock | Dialog | Splash | Utility | Normal
+
+let read_window_type t window : window_type =
+  let atom_prop = t.atom_net_wm_window_type in
+  match read_cardinal_property t window atom_prop ~max_count:8 with
+  | None -> Normal
+  | Some atoms ->
+      let find_type a =
+        let a = Unsigned.ULong.of_int a in
+        if Unsigned.ULong.compare a t.atom_net_wm_window_type_dock = 0 then
+          Some Dock
+        else if Unsigned.ULong.compare a t.atom_net_wm_window_type_dialog = 0
+        then Some Dialog
+        else if Unsigned.ULong.compare a t.atom_net_wm_window_type_splash = 0
+        then Some Splash
+        else if Unsigned.ULong.compare a t.atom_net_wm_window_type_utility = 0
+        then Some Utility
+        else None
+      in
+      (match List.find_map find_type atoms with
+       | Some wt -> wt
+       | None -> Normal)
+
 let set_wm_state t window wm_state =
   set_property_long t ~window ~property:t.atom_wm_state
     ~prop_type:t.atom_wm_state [ wm_state; 0 ]

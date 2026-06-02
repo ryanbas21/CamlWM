@@ -283,67 +283,81 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
   match event with
   | Enter_notify { window } -> Stack_set.focus_window window state
   | Map_request { window } -> (
-      match Display.read_strut display window with
-      | Some _strut ->
+      let wtype = Display.read_window_type display window in
+      match wtype with
+      | Dock ->
           docks := window :: !docks;
           Display.map_window display window;
           Display.select_input display ~window ~mask:Display.mask_enter_window;
           state
-      | None -> (
-          (* Check if this window was spawned by spawn_on.
-             Read the window's _NET_WM_PID and look it up in pending_spawn_on.
-             If found, use that tag as the target workspace (one-shot: remove
-             the entry after matching).
-             If not found, fall through to the normal manage hook. *)
-          let spawn_on_tag =
-            let pid = Display.read_wm_pid display window in
-            match pid with
-            | Some a -> (
-                let tb = pending_spawn_on in
-                match Hashtbl.find_opt tb a with
-                | Some x ->
-                    Hashtbl.remove tb a;
-                    Some x
-                | None -> None)
-            | None -> None
-          in
-          let manage_window tag =
-            let state' = Stack_set.insert_up window state in
-            let state'' = Stack_set.shift tag state' in
-            Display.set_border_width display window config.border_width;
-            Display.map_window display window;
-            Display.set_wm_state display window 1;
-            Display.select_input display ~window ~mask:Display.mask_managed_window;
-            state''
-          in
-          let tile_window () =
-            let state' = Stack_set.insert_up window state in
-            Display.set_border_width display window config.border_width;
-            Display.map_window display window;
-            Display.set_wm_state display window 1;
-            Display.select_input display ~window ~mask:Display.mask_managed_window;
-            state'
-          in
-          match spawn_on_tag with
-          | Some tag -> manage_window tag
+      | Dialog | Splash | Utility ->
+          let state' = Stack_set.insert_up window state in
+          Display.set_border_width display window config.border_width;
+          Display.map_window display window;
+          Display.set_wm_state display window 1;
+          Display.select_input display ~window
+            ~mask:Display.mask_managed_window;
+          state'
+      | Normal -> (
+          match Display.read_strut display window with
+          | Some _strut ->
+              docks := window :: !docks;
+              Display.map_window display window;
+              Display.select_input display ~window
+                ~mask:Display.mask_enter_window;
+              state
           | None -> (
-              let class_name, instance_name =
-                match Display.read_wm_class display window with
-                | Some (inst, cls) -> (cls, inst)
-                | None -> ("", "")
+              let spawn_on_tag =
+                let pid = Display.read_wm_pid display window in
+                match pid with
+                | Some a -> (
+                    let tb = pending_spawn_on in
+                    match Hashtbl.find_opt tb a with
+                    | Some x ->
+                        Hashtbl.remove tb a;
+                        Some x
+                    | None -> None)
+                | None -> None
               in
-              let title =
-                match Display.read_wm_name display window with
-                | Some t -> t
-                | None -> ""
+              let manage_window tag =
+                let state' = Stack_set.insert_up window state in
+                let state'' = Stack_set.shift tag state' in
+                Display.set_border_width display window config.border_width;
+                Display.map_window display window;
+                Display.set_wm_state display window 1;
+                Display.select_input display ~window
+                  ~mask:Display.mask_managed_window;
+                state''
               in
-              let props : Config.window_properties =
-                { class_name; instance_name; title }
+              let tile_window () =
+                let state' = Stack_set.insert_up window state in
+                Display.set_border_width display window config.border_width;
+                Display.map_window display window;
+                Display.set_wm_state display window 1;
+                Display.select_input display ~window
+                  ~mask:Display.mask_managed_window;
+                state'
               in
-              match config.manage_hook props with
-              | Ignore -> state
-              | Shift_to tag -> manage_window tag
-              | Tile | Float -> tile_window ())))
+              match spawn_on_tag with
+              | Some tag -> manage_window tag
+              | None -> (
+                  let class_name, instance_name =
+                    match Display.read_wm_class display window with
+                    | Some (inst, cls) -> (cls, inst)
+                    | None -> ("", "")
+                  in
+                  let title =
+                    match Display.read_wm_name display window with
+                    | Some t -> t
+                    | None -> ""
+                  in
+                  let props : Config.window_properties =
+                    { class_name; instance_name; title }
+                  in
+                  match config.manage_hook props with
+                  | Ignore -> state
+                  | Shift_to tag -> manage_window tag
+                  | Tile | Float -> tile_window ()))))
   | Unmap_notify { window } ->
       if consume_pending_unmap window then state
       else (
