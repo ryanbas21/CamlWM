@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=CamlWM
+Comment=xmonad-style tiling window manager for X11, written in OCaml
+Exec=camlwm
+TryExec=camlwm
+Type=XSession
+DesktopNames=CamlWM

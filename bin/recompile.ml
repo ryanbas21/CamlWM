@@ -165,5 +165,7 @@ let try_recompile () =
     if not needs_compile then exec_cached ()
     else
       match compile sources with
-      | Error msg -> Compile_error msg
+      | Error msg ->
+          if file_exists cached_binary then exec_cached ()
+          else Compile_error msg
       | Ok () -> exec_cached ()
