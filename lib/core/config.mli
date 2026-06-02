@@ -11,6 +11,8 @@ type window_properties = {
 
 type manage_action = Tile | Float | Ignore | Shift_to of string
 
+type startup_entry = { tag : Stack_set.workspace_tag; cmd : string list }
+
 type t = {
   border_width : int;
   focused_color : int;
@@ -20,40 +22,17 @@ type t = {
   tags : string list;
   bindings : Key_binding.t list;
   manage_hook : window_properties -> manage_action;
+  startup : startup_entry list;
 }
 
 val default : t
 
-(** {1 Modifier aliases} *)
+(** {1 Startup helpers} *)
 
-val super : int
-val alt : int
-
-(** {1 Binding helpers} *)
-
-val bind :
-  int ->
-  string ->
-  Key_binding.action ->
-  Key_binding.t list ->
-  Key_binding.t list
-(** [bind mods key action bindings] appends one binding. Pipeable:
-    [default.bindings |> bind super "f" (Spawn ["firefox"])]. *)
-
-val bind_all :
-  (int * string * Key_binding.action) list ->
-  Key_binding.t list ->
-  Key_binding.t list
-(** [bind_all new_bindings existing] appends many bindings at once.
-    [default.bindings |> bind_all [(super, "f", Spawn ["firefox"])]]. *)
-
-val with_mod : int -> (string * Key_binding.action) list -> Key_binding.t list
-(** [with_mod m pairs] creates bindings with a shared modifier.
-    [with_mod super [("Return", Spawn ["ghostty"]); ("q", Close_focused)]]. *)
-
-val workspace_bindings_for : int -> Key_binding.t list
-(** [workspace_bindings_for mod_key] returns View + Shift bindings for
-    workspaces 1--9 using [mod_key] instead of Super. *)
+val spawn_on :
+  Stack_set.workspace_tag -> string list -> startup_entry list -> startup_entry list
+(** [spawn_on tag cmd entries] appends a startup entry. Pipeable:
+    [[] |> spawn_on "dev" ["ghostty"] |> spawn_on "web" ["firefox"]]. *)
 
 (** {1 Manage hook helpers} *)
 

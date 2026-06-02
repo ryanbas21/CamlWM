@@ -82,6 +82,10 @@ val read_wm_class : t -> window -> (string * string) option
 val read_wm_name : t -> window -> string option
 (** Read [WM_NAME] from [window]. Returns the window title or [None]. *)
 
+val read_wm_pid : t -> window -> int option
+(** Read [_NET_WM_PID] from [window]. Returns the process ID that created
+    the window, or [None] if the property is absent. *)
+
 (** {1 EWMH property setters} *)
 
 val set_cardinal_property : t -> window -> Unsigned.ULong.t -> int list -> unit

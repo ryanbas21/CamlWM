@@ -11,8 +11,9 @@ A minimal tiling window manager for X11, written in OCaml. Modelled
 closely on [xmonad](https://xmonad.org/): pure-functional core,
 compiled configuration, no built-in status bar.
 
-> **Status: early development.** Functional but not yet daily-drivable.
-> See [what works](#what-works) and [what's missing](#missing-for-daily-use).
+> **Status: early development.** Functional on a single monitor but not
+> yet daily-drivable. See [what works](#what-works) and
+> [what's missing](#missing-for-daily-use).
 
 ## Install
 
@@ -66,20 +67,36 @@ DISPLAY=:10 camlwm
 - **Directional focus**: jump to the window left/right/above/below
 - **Polite close**: `WM_DELETE_WINDOW` with kill fallback
 - **Manage hooks**: per-window rules based on `WM_CLASS` / `WM_NAME`
-- **Compiled configuration**: xmonad-style `~/.config/camlwm/config.ml`
-- **Strut support**: status bars reserve screen edges
+- **Spawn on workspace**: launch apps on specific workspaces at startup
+  via `_NET_WM_PID` matching
+- **Compiled configuration**: xmonad-style `~/.config/camlwm/config.ml` with
+  multi-file support (split config into modules, dependencies resolved
+  automatically)
+- **Strut support**: status bars reserve screen edges via `_NET_WM_STRUT_PARTIAL`
 - **EWMH properties**: `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`,
   `_NET_CLIENT_LIST`, `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`,
   `_NET_SUPPORTED` -- status bars can read workspace and window state
 - **Focus follows mouse**: moving the pointer into a window focuses it
+- **Lock-modifier handling**: keybindings work regardless of NumLock/CapsLock state
+- **Zombie reaping**: child processes cleaned up via `SIGCHLD` handler
 - **Quit action**: clean WM exit via keybinding
 
 ## Missing for daily use
 
-- Floating windows
+**EWMH/ICCCM gaps** -- apps and panels may misbehave:
+- `_NET_SUPPORTING_WM_CHECK` not set (some panels won't detect the WM)
+- `_NET_WM_WINDOW_TYPE` not read (docks, dialogs, splash screens treated as normal tiles)
+- `_NET_WM_STATE` not handled (no fullscreen, no maximise)
+- `WM_TRANSIENT_FOR` not read (dialogs don't stay above their parent)
+- No `property_notify` listening (can't react to title changes, state requests, or urgency)
+
+**Floating & mouse:**
+- Floating windows (`Config.Float` exists but isn't wired up)
 - Mouse bindings (drag to move/resize)
+
+**Infrastructure:**
 - Multi-monitor
-- Restart-in-place
+- Restart-in-place (config recompile loses window state)
 
 ## Keybindings
 
@@ -99,81 +116,133 @@ DISPLAY=:10 camlwm
 
 ## Configuration
 
-camlWM uses xmonad's compiled configuration model. Create
-`~/.config/camlwm/config.ml`:
+camlWM uses xmonad's compiled configuration model. All `.ml` and `.mli`
+files in `~/.config/camlwm/` are compiled together, with `config.ml`
+as the entry point (always compiled last). A minimal single-file config:
 
 ```ocaml
+(* ~/.config/camlwm/config.ml *)
 open Camlwm_core
 
 let () =
-  Camlwm_wm.Wm.run
+  Camlwm_wm.run
     { Config.default with
       gap = 8;
       focused_color = 0xFF5733;
       tags = [ "web"; "dev"; "chat"; "4"; "5" ];
-      manage_hook = (fun props ->
-        if props.class_name = "Gimp" then Config.Float
-        else if props.instance_name = "desktop_window" then Config.Ignore
-        else Config.Tile
-      );
     }
 ```
 
 On startup, camlWM compiles and execs your config. If compilation
-fails, the error is written to `~/.config/camlwm/error.log` and the
-WM falls back to defaults.
+fails, the error is written to `~/.config/camlwm/build/error.log` and
+the WM falls back to defaults. Build artifacts go in
+`~/.config/camlwm/build/` to keep the config directory clean.
 
 Use `camlwm --recompile` to check your config without starting the WM.
 
+### Multi-file configs
+
+Split your config into modules by adding `.ml` files alongside
+`config.ml`. Dependencies are resolved automatically with `ocamldep`.
+
+```
+~/.config/camlwm/
+  commands.ml      -- shell commands (terminal, browser, etc.)
+  hooks.ml         -- manage hooks
+  config.ml        -- entry point, references Commands and Hooks
+  build/           -- compiled artifacts (auto-created)
+```
+
+```ocaml
+(* ~/.config/camlwm/commands.ml *)
+let terminal = [ "ghostty" ]
+let browser = [ "firefox" ]
+let launcher = [ "rofi"; "-show"; "drun" ]
+```
+
+```ocaml
+(* ~/.config/camlwm/config.ml *)
+open Camlwm_core
+
+let () =
+  Camlwm_wm.run
+    { Config.default with
+      bindings =
+        Key_binding.with_mod Key_binding.super [
+          ("Return", Spawn Commands.terminal);
+          ("f", Spawn Commands.browser);
+          ("space", Spawn Commands.launcher);
+        ]
+        @ Key_binding.workspace_bindings_for Key_binding.super;
+    }
+```
+
 ### Custom keybindings
 
-Use the helper functions to build bindings concisely:
+The `Key_binding` module provides helpers to build bindings concisely:
 
 ```ocaml
 open Camlwm_core
 
-let super = Config.super
+let super = Key_binding.super
 let shift = Key_binding.shift
 
 let () =
-  Camlwm_wm.Wm.run
+  Camlwm_wm.run
     { Config.default with
       bindings =
         Config.default.bindings
         (* Add individual bindings with |> pipe *)
-        |> Config.bind super "Return" (Spawn ["ghostty"])
-        |> Config.bind super "f" (Spawn ["firefox"])
-        |> Config.bind (super lor shift) "x" (Spawn ["loginctl"; "lock-session"])
+        |> Key_binding.bind super "Return" (Spawn ["ghostty"])
+        |> Key_binding.bind super "f" (Spawn ["firefox"])
+        |> Key_binding.bind (super lor shift) "x" (Spawn ["loginctl"; "lock-session"])
         (* Or add many at once *)
-        |> Config.bind_all [
+        |> Key_binding.bind_all [
           (super, "space", Spawn ["rofi"; "-show"; "drun"]);
           (super, "b", Spawn ["polybar-msg"; "cmd"; "toggle"]);
         ];
     }
 ```
 
-**`Config.with_mod`** creates bindings that share a modifier:
+**`Key_binding.with_mod`** creates bindings that share a modifier:
 
 ```ocaml
-Config.with_mod super [
+Key_binding.with_mod super [
   ("Return", Spawn ["ghostty"]);
   ("f", Spawn ["firefox"]);
   ("q", Close_focused);
 ]
 ```
 
-**`Config.workspace_bindings_for`** generates workspace View + Shift
+**`Key_binding.workspace_bindings_for`** generates workspace View + Shift
 bindings for a different mod key:
 
 ```ocaml
 (* Use Alt instead of Super for workspace switching *)
 { Config.default with
   bindings =
-    Config.with_mod Config.alt [
+    Key_binding.with_mod Key_binding.alt [
       ("Return", Spawn ["ghostty"]);
       ("space", Cycle_layout);
     ]
-    @ Config.workspace_bindings_for Config.alt;
+    @ Key_binding.workspace_bindings_for Key_binding.alt;
+}
+```
+
+### Startup programs
+
+Use `Config.spawn_on` to launch programs on specific workspaces at
+startup. Each entry is one-shot — the window is placed by matching
+`_NET_WM_PID`, then the rule is consumed.
+
+```ocaml
+{ Config.default with
+  startup =
+    []
+    |> Config.spawn_on "dev" [ "ghostty" ]
+    |> Config.spawn_on "dev" [ "ghostty" ]
+    |> Config.spawn_on "dev" [ "ghostty" ]
+    |> Config.spawn_on "web" [ "firefox" ];
 }
 ```
 
@@ -199,14 +268,14 @@ manage_hook = (fun props ->
 
 ### Modifier aliases
 
-| Alias             | Value                |
-| ----------------- | -------------------- |
-| `Config.super`    | Super / Windows key  |
-| `Config.alt`      | Alt key              |
-| `Key_binding.shift` | Shift              |
-| `Key_binding.control` | Control           |
+| Alias                  | Value                |
+| ---------------------- | -------------------- |
+| `Key_binding.super`    | Super / Windows key  |
+| `Key_binding.alt`      | Alt key              |
+| `Key_binding.shift`    | Shift                |
+| `Key_binding.control`  | Control              |
 
-Combine with `lor`: `Config.super lor Key_binding.shift`.
+Combine with `lor`: `Key_binding.super lor Key_binding.shift`.
 
 ### Available actions
 
@@ -226,6 +295,7 @@ Combine with `lor`: `Config.super lor Key_binding.shift`.
 | `tags`            | `string list`                       | `["1".."5"]`     |
 | `bindings`        | `Key_binding.t list`                | see Keybindings  |
 | `manage_hook`     | `window_properties -> manage_action`| `fun _ -> Tile`  |
+| `startup`         | `startup_entry list`                | `[]`             |
 
 ## Contributing
 

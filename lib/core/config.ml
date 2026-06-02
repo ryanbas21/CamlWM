@@ -25,6 +25,8 @@ type window_properties = {
 
 type manage_action = Tile | Float | Ignore | Shift_to of string
 
+type startup_entry = { tag : Stack_set.workspace_tag; cmd : string list }
+
 type t = {
   border_width : int;
   focused_color : int;
@@ -34,89 +36,26 @@ type t = {
   tags : string list;
   bindings : Key_binding.t list;
   manage_hook : window_properties -> manage_action;
+  startup : startup_entry list;
 }
 
-let workspace_bindings =
-  List.concat_map
-    (fun tag ->
-      [
-        {
-          Key_binding.modifiers = Key_binding.mod4;
-          key = tag;
-          action = View tag;
-        };
-        {
-          Key_binding.modifiers = Key_binding.mod4 lor Key_binding.shift;
-          key = tag;
-          action = Shift tag;
-        };
-      ])
-    [ "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9" ]
-
 let bindings : Key_binding.t list =
-  [
-    {
-      Key_binding.modifiers = Key_binding.mod4;
-      key = "Return";
-      action = Spawn [ "xterm"; "-fa"; "Monospace"; "-fs"; "12" ];
-    };
-    {
-      Key_binding.modifiers = Key_binding.mod4;
-      key = "j";
-      action = Focus_direction Down;
-    };
-    {
-      Key_binding.modifiers = Key_binding.mod4;
-      key = "k";
-      action = Focus_direction Up;
-    };
-    {
-      Key_binding.modifiers = Key_binding.mod4;
-      key = "h";
-      action = Focus_direction Left;
-    };
-    {
-      Key_binding.modifiers = Key_binding.mod4;
-      key = "l";
-      action = Focus_direction Right;
-    };
-    {
-      Key_binding.modifiers = Key_binding.mod4;
-      key = "space";
-      action = Cycle_layout;
-    };
-    {
-      Key_binding.modifiers = Key_binding.mod4;
-      key = "m";
-      action = Swap_master;
-    };
-    {
-      Key_binding.modifiers = Key_binding.mod4;
-      key = "q";
-      action = Close_focused;
-    };
-    {
-      Key_binding.modifiers = Key_binding.mod4 lor Key_binding.shift;
-      key = "h";
-      action = Shrink;
-    };
-    {
-      Key_binding.modifiers = Key_binding.mod4 lor Key_binding.shift;
-      key = "l";
-      action = Expand;
-    };
-    {
-      Key_binding.modifiers = Key_binding.mod4;
-      key = "comma";
-      action = Dec_master;
-    };
-    {
-      Key_binding.modifiers = Key_binding.mod4;
-      key = "period";
-      action = Inc_master;
-    };
-  ]
-  @ workspace_bindings
+  Key_binding.with_mod Key_binding.mod4
+    [
+      ("Return", Spawn [ "xterm"; "-fa"; "Monospace"; "-fs"; "12" ]);
+      ("j", Focus_direction Down);
+      ("k", Focus_direction Up);
+      ("h", Focus_direction Left);
+      ("l", Focus_direction Right);
+      ("space", Cycle_layout);
+      ("m", Swap_master);
+      ("q", Close_focused);
+      ("comma", Dec_master);
+      ("period", Inc_master);
+    ]
+  @ Key_binding.with_mod (Key_binding.mod4 lor Key_binding.shift)
+      [ ("h", Shrink); ("l", Expand) ]
+  @ Key_binding.workspace_bindings_for Key_binding.mod4
 
 let default =
   {
@@ -130,37 +69,16 @@ let default =
     tags = [ "1"; "2"; "3"; "4"; "5" ];
     bindings;
     manage_hook = (fun _prop -> Tile);
+    startup = [];
   }
 
-let bind mods tag action bindings =
-  bindings @ [ { Key_binding.modifiers = mods; key = tag; action } ]
-
-let bind_all new_bindings existing_bindings =
-  existing_bindings
-  @ List.map
-      (fun (mods, key, action) -> { Key_binding.modifiers = mods; key; action })
-      new_bindings
-
-let super = Key_binding.mod4
-let alt = Key_binding.mod1
+let spawn_on tag cmd entries = entries @ [{ tag; cmd }]
 
 let match_class cls action =
  fun props -> if props.class_name = cls then Some action else None
 
 let match_instance inst action =
  fun props -> if props.instance_name = inst then Some action else None
-
-let with_mod m bindings =
-  List.map
-    (fun (key, action) -> { Key_binding.modifiers = m; key; action })
-    bindings
-
-let workspace_bindings_for mod_key =
-  List.map
-    (fun (b : Key_binding.t) ->
-      let base_mod = b.modifiers land lnot Key_binding.mod4 in
-      { b with modifiers = base_mod lor mod_key })
-    workspace_bindings
 
 let rules r props =
   match List.find_map (fun rule -> rule props) r with

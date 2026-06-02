@@ -46,6 +46,23 @@ let lock_combos =
 
    A counter (not a bool) so back-to-back hides of the same window are
    handled correctly. *)
+(* ---------- Spawn-on tracking ----------
+
+   When a startup entry (or future Spawn_on action) fires, we fork the
+   command and record its PID here, keyed to a target workspace tag.
+   When a new window maps, we read its _NET_WM_PID and look it up in
+   this table. If found, we shift the window to the target workspace
+   and remove the entry (one-shot). *)
+let pending_spawn_on : (int, Stack_set.workspace_tag) Hashtbl.t =
+  Hashtbl.create 16
+
+(* Spawn a command and register its PID for workspace placement. *)
+let spawn_and_track tag cmd =
+  match Unix.fork () with
+  | 0 -> (
+      try Unix.execvp (List.hd cmd) (Array.of_list cmd) with _ -> exit 127)
+  | pid -> Hashtbl.replace pending_spawn_on pid tag
+
 let pending_unmaps : (Event.window, int) Hashtbl.t = Hashtbl.create 16
 
 let note_pending_unmaps w =
@@ -273,34 +290,58 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
           Display.select_input display ~window ~mask:Display.mask_enter_window;
           state
       | None -> (
-          let class_name, instance_name =
-            match Display.read_wm_class display window with
-            | Some (inst, cls) -> (cls, inst)
-            | None -> ("", "")
+          (* Check if this window was spawned by spawn_on.
+             Read the window's _NET_WM_PID and look it up in pending_spawn_on.
+             If found, use that tag as the target workspace (one-shot: remove
+             the entry after matching).
+             If not found, fall through to the normal manage hook. *)
+          let spawn_on_tag =
+            let pid = Display.read_wm_pid display window in
+            match pid with
+            | Some a -> (
+                let tb = pending_spawn_on in
+                match Hashtbl.find_opt tb a with
+                | Some x ->
+                    Hashtbl.remove tb a;
+                    Some x
+                | None -> None)
+            | None -> None
           in
-          let title =
-            match Display.read_wm_name display window with
-            | Some t -> t
-            | None -> ""
+          let manage_window tag =
+            let state' = Stack_set.insert_up window state in
+            let state'' = Stack_set.shift tag state' in
+            Display.set_border_width display window config.border_width;
+            Display.map_window display window;
+            Display.select_input display ~window ~mask:Display.mask_enter_window;
+            state''
           in
-          let props : Config.window_properties =
-            { class_name; instance_name; title }
+          let tile_window () =
+            let state' = Stack_set.insert_up window state in
+            Display.set_border_width display window config.border_width;
+            Display.map_window display window;
+            Display.select_input display ~window ~mask:Display.mask_enter_window;
+            state'
           in
-          match config.manage_hook props with
-          | Ignore -> state
-          | Shift_to tag ->
-              let state' = Stack_set.insert_up window state in
-              let state'' = Stack_set.shift tag state' in
-              Display.set_border_width display window config.border_width;
-              Display.map_window display window;
-              Display.select_input display ~window ~mask:Display.mask_enter_window;
-              state''
-          | Tile | Float ->
-              let state' = Stack_set.insert_up window state in
-              Display.set_border_width display window config.border_width;
-              Display.map_window display window;
-              Display.select_input display ~window ~mask:Display.mask_enter_window;
-              state'))
+          match spawn_on_tag with
+          | Some tag -> manage_window tag
+          | None -> (
+              let class_name, instance_name =
+                match Display.read_wm_class display window with
+                | Some (inst, cls) -> (cls, inst)
+                | None -> ("", "")
+              in
+              let title =
+                match Display.read_wm_name display window with
+                | Some t -> t
+                | None -> ""
+              in
+              let props : Config.window_properties =
+                { class_name; instance_name; title }
+              in
+              match config.manage_hook props with
+              | Ignore -> state
+              | Shift_to tag -> manage_window tag
+              | Tile | Float -> tile_window ())))
   | Unmap_notify { window } ->
       if consume_pending_unmap window then state
       else Stack_set.delete window state
@@ -386,7 +427,10 @@ let run (config : Config.t) =
       Display.install_error_handler ~on_error:(fun ~event_type ->
           log "X error: type=%d (ignored)" event_type);
 
-      Sys.set_signal Sys.sigchld (Sys.Signal_handle (fun _ -> try ignore (Unix.waitpid [Unix.WNOHANG] (-1)) with _ -> ()));
+      Sys.set_signal Sys.sigchld
+        (Sys.Signal_handle
+           (fun _ ->
+             try ignore (Unix.waitpid [ Unix.WNOHANG ] (-1)) with _ -> ()));
       Display.select_root_wm_events display ~window:root;
       Display.sync display ~discard:false;
       log "Selected WM events on root window %d" root;
@@ -427,6 +471,13 @@ let run (config : Config.t) =
       in
 
       init_ewmh display root config;
+
+      (* Spawn startup entries and track their PIDs *)
+      List.iter
+        (fun (entry : Config.startup_entry) ->
+          spawn_and_track entry.tag entry.cmd)
+        config.startup;
+
       log "Entering event loop";
       let rec loop () =
         let event = Display.next_event display in

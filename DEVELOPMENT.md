@@ -114,20 +114,51 @@ camlwm/
 
 ## Roadmap
 
-**Phase 3.5 -- interoperability** (next)
-- EWMH compliance so status bars can read workspace/window state
-- Focus follows mouse / click to focus
-- Startup hook
+**Done**
+- Three layouts (Tall, Wide, Full) with per-workspace state
+- Configurable master area (split ratio, master count)
+- 9 workspaces with View / Shift bindings
+- Directional focus (left/right/above/below by center-point distance)
+- Polite close (`WM_DELETE_WINDOW` with kill fallback)
+- Manage hooks (per-window rules by `WM_CLASS` / `WM_NAME`)
+- Compiled configuration (xmonad-style `~/.config/camlwm/config.ml`)
+- Multi-file configs (all `.ml`/`.mli` in config dir compiled together via `ocamldep`)
+- Strut support (`_NET_WM_STRUT_PARTIAL` for status bars)
+- EWMH basics: `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`,
+  `_NET_CLIENT_LIST`, `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`,
+  `_NET_SUPPORTED`
+- Focus follows mouse (`Enter_notify`)
+- Zombie child reaping (`SIGCHLD` handler)
+- Lock-modifier handling (NumLock/CapsLock combos on key grabs)
+- Spawn on workspace (`spawn_on` with `_NET_WM_PID` matching)
 
-**Phase 4 -- proper window lifecycle**
-- Floating windows (drag/resize, dialogs auto-float)
-- Restart-in-place that preserves state
-- Mouse bindings
+**Phase 4 -- EWMH/ICCCM compliance** (next)
+- Set `_NET_SUPPORTING_WM_CHECK` on root (panels won't recognise the WM without it)
+- Read `_NET_WM_WINDOW_TYPE` and auto-classify dock/dialog/splash/toolbar
+- Handle `_NET_WM_STATE` changes (fullscreen, maximized, demands-attention)
+- Read `WM_TRANSIENT_FOR` so dialogs stay above their parent
+- Listen for `property_notify` events (title changes, state requests, urgency)
+- Set `WM_STATE` on managed windows
+- Set `_NET_WM_DESKTOP` per window
+
+**Phase 5 -- floating layer & mouse**
+- Wire up the existing `Config.Float` / `Stack_set.floating` path
+- Auto-float windows by `_NET_WM_WINDOW_TYPE` (dialog, splash, utility)
+- Mouse bindings: decode `ButtonPress` / `ButtonRelease` / `MotionNotify`
+- Drag to move and drag to resize floating windows
+- Keyboard move/resize for floating windows
+
+**Phase 6 -- multi-monitor & restart**
+- Multi-monitor via Xinerama (Stack_set already has the multi-screen structure)
+- XRandR hot-plug detection
+- Restart-in-place with state serialisation (workspace assignments, layout
+  ratios, master counts)
 
 **Later**
 - More layouts (Mirror combinator, Spiral, Tabbed)
-- Multi-monitor (Xinerama)
-- Urgency hints
+- Urgency hints (parse `WM_HINTS` urgency bit, visual indicator)
+- Focus stealing prevention (`_NET_WM_USER_TIME`)
+- `_NET_CLIENT_LIST_STACKING` (z-order for pagers)
 
 ## Note
 

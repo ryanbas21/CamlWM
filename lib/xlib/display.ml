@@ -28,6 +28,7 @@ type t = {
   atom_net_client_list : Unsigned.ulong;
   atom_net_active_window : Unsigned.ulong;
   atom_net_utf8_string : Unsigned.ulong;
+  atom_net_wm_pid : Unsigned.ulong;
 }
 
 (* Reserved-edge declaration a status bar (or any docked app) sets via
@@ -65,6 +66,7 @@ let open_default () =
         atom_net_client_list = atom "_NET_CLIENT_LIST";
         atom_net_active_window = atom "_NET_ACTIVE_WINDOW";
         atom_net_utf8_string = atom "UTF8_STRING";
+        atom_net_wm_pid = atom "_NET_WM_PID";
       }
 
 let close t = ignore (Ffi.x_close_display t.raw)
@@ -375,3 +377,8 @@ let read_wm_class t window : (string * string) option =
       match String.split_on_char '\000' s with
       | instance :: cls :: _ -> Some (instance, cls)
       | _ -> None)
+
+let read_wm_pid t window : int option =
+  match read_cardinal_property t window t.atom_net_wm_pid ~max_count:1 with
+  | Some [ pid ] -> Some pid
+  | _ -> None

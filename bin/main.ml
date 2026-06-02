@@ -23,9 +23,9 @@ let () =
       log "No config found at %s" Recompile.config_source;
       exit 1)
     else
-      match Recompile.compile () with
+      match Recompile.compile (Recompile.source_files Recompile.config_dir) with
       | Ok () ->
-          log "Compiled %s → %s" Recompile.config_source Recompile.cached_binary;
+          log "Compiled %s → %s" Recompile.config_dir Recompile.cached_binary;
           exit 0
       | Error msg ->
           log "Compilation failed:\n%s" msg;
@@ -34,12 +34,12 @@ let () =
     match Recompile.try_recompile () with
     | No_user_config ->
         log "No user config found, using defaults";
-        Camlwm_wm.Wm.run Config.default
+        Camlwm_wm.run Config.default
     | Compile_error msg ->
         log "Config compilation failed (see %s):\n%s" Recompile.error_log msg;
         log "Falling back to default config";
-        Camlwm_wm.Wm.run Config.default
+        Camlwm_wm.run Config.default
     | Exec_failed msg ->
         log "Failed to exec compiled config: %s" msg;
         log "Falling back to default config";
-        Camlwm_wm.Wm.run Config.default
+        Camlwm_wm.run Config.default

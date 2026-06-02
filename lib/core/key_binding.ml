@@ -40,3 +40,38 @@ let mod4 = 0x40 (* Super / "Windows" key *)
 
 (* Combine several modifiers: [mods [mod4; shift]] = 0x41. *)
 let mods = List.fold_left ( lor ) 0
+
+(* Convenience aliases matching xmonad's common names. *)
+let super = mod4
+let alt = mod1
+
+(* --- Binding construction helpers ---------------------------------------- *)
+
+let with_mod m bindings =
+  List.map (fun (key, action) -> { modifiers = m; key; action }) bindings
+
+let bind m key action bindings =
+  bindings @ [ { modifiers = m; key; action } ]
+
+let bind_all new_bindings existing =
+  existing
+  @ List.map (fun (m, key, action) -> { modifiers = m; key; action }) new_bindings
+
+(* View + Shift workspace bindings for tags "1".."9", using [mod4] as the
+   base modifier.  [workspace_bindings_for] re-maps them to a different
+   mod key. *)
+let workspace_bindings =
+  List.concat_map
+    (fun tag ->
+      [
+        { modifiers = mod4; key = tag; action = View tag };
+        { modifiers = mod4 lor shift; key = tag; action = Shift tag };
+      ])
+    [ "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9" ]
+
+let workspace_bindings_for mod_key =
+  List.map
+    (fun (b : t) ->
+      let base_mod = b.modifiers land lnot mod4 in
+      { b with modifiers = base_mod lor mod_key })
+    workspace_bindings
