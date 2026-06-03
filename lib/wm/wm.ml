@@ -377,14 +377,20 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
   | Enter_notify { window = _ } -> state
   | Map_notify { window; override_redirect } ->
       (* Override-redirect windows (e.g. polybar) bypass MapRequest.
-         Detect docks here so their struts are respected. *)
+         Detect docks here so their struts are respected.
+         Also subscribe to PropertyNotify in case struts are set after map. *)
       if override_redirect && not (List.mem window !docks) then begin
         let wtype = Display.read_window_type display window in
         let strut = Display.read_strut display window in
         if wtype = Dock || strut <> None then begin
           docks := window :: !docks;
           Hashtbl.replace mapped_windows window ();
-          log "Dock mapped via MapNotify (override_redirect): window=%d" window
+          log "Dock via MapNotify: window=%d" window
+        end else begin
+          (* Not a dock yet — subscribe to property changes in case
+             it sets _NET_WM_WINDOW_TYPE or struts after mapping *)
+          Display.select_input display ~window
+            ~mask:Display.mask_managed_window
         end
       end;
       state
@@ -536,20 +542,32 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
       | None -> state
       | Some action -> run_action config display ~screen action state)
   | Property_notify { window; atom } ->
-      (* If a dock updates its strut after mapping, adopt it *)
-      let strut_atom =
-        Unsigned.ULong.to_int (Display.atom_net_wm_strut display)
-      in
-      let strut_partial_atom =
-        Unsigned.ULong.to_int (Display.atom_net_wm_strut_partial display)
-      in
-      if (atom = strut_atom || atom = strut_partial_atom)
-         && not (List.mem window !docks)
-         && Display.read_strut display window <> None
-      then (
-        docks := window :: !docks;
-        (* Remove from tiling if it was managed *)
-        Stack_set.delete window state)
+      (* Detect docks that set strut or window type after mapping *)
+      if not (List.mem window !docks) then begin
+        let strut_atom =
+          Unsigned.ULong.to_int (Display.atom_net_wm_strut display)
+        in
+        let strut_partial_atom =
+          Unsigned.ULong.to_int (Display.atom_net_wm_strut_partial display)
+        in
+        let wm_type_atom =
+          Unsigned.ULong.to_int (Display.atom_net_wm_window_type display)
+        in
+        let dominated =
+          atom = strut_atom || atom = strut_partial_atom || atom = wm_type_atom
+        in
+        if dominated then
+          let is_dock =
+            Display.read_window_type display window = Dock
+            || Display.read_strut display window <> None
+          in
+          if is_dock then (
+            docks := window :: !docks;
+            log "Dock via PropertyNotify: window=%d" window;
+            Stack_set.delete window state)
+          else state
+        else state
+      end
       else state
   | Client_message { window; message_type; data } ->
       let net_wm_state =
@@ -742,8 +760,8 @@ let run (config : Config.t) =
       log "Entering event loop";
       let rec loop () =
         let event = Display.next_event display in
+        state := handle_event config display ~screen:(usable_screen ()) event !state;
         let screen = usable_screen () in
-        state := handle_event config display ~screen event !state;
         reconcile_visibility display !state;
         apply_layout config display ~full_screen:screen_detail ~screen !state;
         update_borders config display !state;
