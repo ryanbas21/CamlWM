@@ -33,6 +33,11 @@ fi
 
 trap smoke_cleanup EXIT
 
+# Keep tests independent of the developer's real ~/.config/camlwm/config.ml.
+SMOKE_HOME=$(mktemp -d)
+export HOME="$SMOKE_HOME"
+unset XDG_CONFIG_HOME
+
 # ----------------------------------------------------------------------
 # Scenarios
 # ----------------------------------------------------------------------
@@ -42,6 +47,76 @@ scenario_default_config_boots() {
     # boot with Config.default and log that fact. smoke_boot already
     # asserts "Entering event loop" — this checks the config path.
     wait_for_log "No user config found, using defaults" 2
+}
+
+scenario_polybar_strut_reserves_space() {
+    if ! command -v polybar >/dev/null 2>&1; then
+        echo "smoke: polybar not on PATH — skipping strut geometry check"
+        return 0
+    fi
+
+    local cfg="$SMOKE_HOME/polybar.ini"
+    cat > "$cfg" <<'EOF'
+[bar/camlwm-test]
+width = 100%
+height = 28
+bottom = false
+override-redirect = false
+wm-restack = generic
+background = #222222
+foreground = #eeeeee
+font-0 = monospace:size=10
+modules-left = title
+modules-center = date
+tray-position = none
+
+[module/title]
+type = internal/xwindow
+label = camlWM strut test
+
+[module/date]
+type = internal/date
+interval = 1
+date = %H:%M:%S
+label = %date%
+EOF
+
+    DISPLAY="$SMOKE_DISPLAY" polybar -c "$cfg" camlwm-test >/dev/null 2>&1 &
+    local polybar_pid=$!
+
+    local work_y=""
+    for _ in {1..40}; do
+        work_y=$(DISPLAY="$SMOKE_DISPLAY" xprop -root _NET_WORKAREA 2>/dev/null \
+            | grep -o '= .*' | grep -o '[0-9][0-9]*' | sed -n '2p')
+        [[ "$work_y" = "28" ]] && break
+        sleep 0.1
+    done
+    if [[ "$work_y" != "28" ]]; then
+        echo "smoke: _NET_WORKAREA y=$work_y, expected 28 after polybar"
+        kill "$polybar_pid" 2>/dev/null || true
+        return 1
+    fi
+
+    DISPLAY="$SMOKE_DISPLAY" xterm -fa Monospace -fs 12 >/dev/null 2>&1 &
+    wait_for_visible_count xterm 1 8 || {
+        kill "$polybar_pid" 2>/dev/null || true
+        return 1
+    }
+
+    local wid y
+    wid=$(DISPLAY="$SMOKE_DISPLAY" xdotool search --onlyvisible --class xterm 2>/dev/null | head -1)
+    y=$(DISPLAY="$SMOKE_DISPLAY" xdotool getwindowgeometry --shell "$wid" 2>/dev/null \
+        | awk -F= '/^Y=/{print $2}')
+    if [[ -z "$y" || "$y" -lt 28 ]]; then
+        echo "smoke: xterm Y=$y overlaps polybar/workarea"
+        DISPLAY="$SMOKE_DISPLAY" xdotool windowkill "$wid" 2>/dev/null || true
+        kill "$polybar_pid" 2>/dev/null || true
+        wait_for_visible_count xterm 0 3 || true
+        return 1
+    fi
+
+    DISPLAY="$SMOKE_DISPLAY" xdotool windowkill "$wid" 2>/dev/null || true
+    wait_for_visible_count xterm 0 5 || return 1
 }
 
 scenario_keypress_fires() {
@@ -175,7 +250,8 @@ scenario_ewmh_properties_set() {
     root_props=$(DISPLAY="$SMOKE_DISPLAY" xprop -root 2>/dev/null)
 
     for prop in _NET_SUPPORTED _NET_NUMBER_OF_DESKTOPS _NET_DESKTOP_NAMES \
-                _NET_CURRENT_DESKTOP _NET_CLIENT_LIST _NET_ACTIVE_WINDOW; do
+                _NET_CURRENT_DESKTOP _NET_WORKAREA _NET_CLIENT_LIST \
+                _NET_ACTIVE_WINDOW; do
         if ! echo "$root_props" | grep -q "$prop"; then
             echo "smoke: EWMH property $prop not set on root"
             return 1
@@ -255,6 +331,7 @@ PRE_BOOT_SCENARIOS=(
 SCENARIOS=(
     scenario_default_config_boots
     scenario_ewmh_properties_set
+    scenario_polybar_strut_reserves_space
     scenario_keypress_fires
     scenario_workspace_hide_show
     scenario_close_focused

@@ -7,9 +7,8 @@
 open Stack_set
 open Geometry
 
-let do_layout ~ratio:_ ~master_count:_
-    ~screen:(screen_detail : screen_detail) (windows : window list) :
-    (window * rect) list =
+let do_layout ~ratio:_ ~master_count:_ ~screen:(screen_detail : screen_detail)
+    (windows : window list) : (window * rect) list =
   let full =
     {
       x = screen_detail.sx;

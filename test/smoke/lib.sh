@@ -14,6 +14,7 @@ smoke_cleanup() {
     local rc=$?
     [[ -n "${CAMLWM_PID:-}" ]] && kill -9 "$CAMLWM_PID" 2>/dev/null || true
     [[ -n "${XEPHYR_PID:-}" ]] && kill -9 "$XEPHYR_PID" 2>/dev/null || true
+    [[ -n "${SMOKE_HOME:-}" ]] && rm -rf "$SMOKE_HOME" 2>/dev/null || true
     if [[ -n "${CAMLWM_LOG:-}" ]]; then
         if [[ $rc -ne 0 || "${SMOKE_VERBOSE:-0}" = "1" ]]; then
             echo "=== camlwm log ==="
@@ -86,8 +87,27 @@ wait_for_log() {
 # test proceeds.
 # Usage: send_key super+Return
 send_key() {
-    DISPLAY="$SMOKE_DISPLAY" xdotool key --delay 50 "$1"
-    sleep 0.15
+    local combo="$1"
+    local before=""
+    if [[ -n "${CAMLWM_LOG:-}" && -f "${CAMLWM_LOG:-}" ]]; then
+        before=$(count_log_matches "Key_press")
+    fi
+
+    local attempt
+    for attempt in 1 2 3; do
+        DISPLAY="$SMOKE_DISPLAY" xdotool key --clearmodifiers --delay 50 "$combo"
+        sleep 0.2
+
+        # XTest delivery can occasionally race the nested server while focus is
+        # moving between clients. Retrying here keeps scenario assertions about
+        # WM behavior instead of xdotool timing.
+        if [[ -z "$before" ]] || [[ $(count_log_matches "Key_press") -gt "$before" ]]; then
+            return 0
+        fi
+    done
+
+    echo "smoke: $combo never produced a Key_press after 3 attempts"
+    return 1
 }
 
 # Count visible (mapped) windows matching an X11 class.
@@ -113,7 +133,9 @@ first_visible_width() {
 # Count log lines matching a pattern. Used to detect "did this specific
 # action happen *after* this point" — see wait_for_log_increment.
 count_log_matches() {
-    grep -c "$1" "$CAMLWM_LOG" 2>/dev/null || echo 0
+    local n
+    n=$(grep -c "$1" "$CAMLWM_LOG" 2>/dev/null || true)
+    echo "${n:-0}"
 }
 
 # Block until [count_log_matches NEEDLE] exceeds START_COUNT — i.e. a

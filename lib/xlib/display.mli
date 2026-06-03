@@ -136,6 +136,7 @@ val atom_net_supporting_wm_check : t -> Unsigned.ULong.t
 val atom_net_number_of_desktops : t -> Unsigned.ULong.t
 val atom_net_desktop_names : t -> Unsigned.ULong.t
 val atom_net_current_desktop : t -> Unsigned.ULong.t
+val atom_net_workarea : t -> Unsigned.ULong.t
 val atom_net_client_list : t -> Unsigned.ULong.t
 val atom_net_active_window : t -> Unsigned.ULong.t
 val atom_net_wm_state : t -> Unsigned.ULong.t

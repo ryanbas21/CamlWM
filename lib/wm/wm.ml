@@ -374,7 +374,9 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
   | Button_press { window } ->
       Display.allow_events display;
       Stack_set.focus_window window state
-  | Enter_notify { window = _ } -> state
+  | Enter_notify { window } ->
+      if Stack_set.member window state then Stack_set.focus_window window state
+      else state
   | Map_notify { window; override_redirect } ->
       (* Override-redirect windows (e.g. polybar) bypass MapRequest.
          Detect docks here so their struts are respected.
@@ -385,6 +387,8 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
         if wtype = Dock || strut <> None then begin
           docks := window :: !docks;
           Hashtbl.replace mapped_windows window ();
+          Display.select_input display ~window
+            ~mask:Display.mask_managed_window;
           log "Dock via MapNotify: window=%d" window
         end else begin
           (* Not a dock yet — subscribe to property changes in case
@@ -401,7 +405,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
         docks := window :: !docks;
         Display.map_window display window;
         Hashtbl.replace mapped_windows window ();
-        Display.select_input display ~window ~mask:Display.mask_enter_window;
+        Display.select_input display ~window ~mask:Display.mask_managed_window;
         log "Registered dock: window=%d" window;
         state
       end
@@ -563,6 +567,8 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
           in
           if is_dock then (
             docks := window :: !docks;
+            Display.select_input display ~window
+              ~mask:Display.mask_managed_window;
             log "Dock via PropertyNotify: window=%d" window;
             Stack_set.delete window state)
           else state
@@ -622,6 +628,7 @@ let init_ewmh (display : Display.t) (root : int) (config : Config.t) =
       Display.atom_net_number_of_desktops display;
       Display.atom_net_desktop_names display;
       Display.atom_net_current_desktop display;
+      Display.atom_net_workarea display;
       Display.atom_net_client_list display;
       Display.atom_net_active_window display;
       Display.atom_net_wm_state display;
@@ -629,8 +636,8 @@ let init_ewmh (display : Display.t) (root : int) (config : Config.t) =
       Display.atom_net_wm_window_type display;
     ]
 
-let update_ewmh display root (config : Config.t) (state : Layout.t Stack_set.t)
-    =
+let update_ewmh display root (config : Config.t) ~workarea
+    (state : Layout.t Stack_set.t) =
   let current_idx =
     let rec find i = function
       | [] -> 0
@@ -642,6 +649,21 @@ let update_ewmh display root (config : Config.t) (state : Layout.t Stack_set.t)
   Display.set_cardinal_property display root
     (Display.atom_net_current_desktop display)
     [ current_idx ];
+  let workarea_values =
+    List.concat
+      (List.map
+         (fun _ ->
+           [
+             workarea.Stack_set.sx;
+             workarea.sy;
+             workarea.sw;
+             workarea.sh;
+           ])
+         config.tags)
+  in
+  Display.set_cardinal_property display root
+    (Display.atom_net_workarea display)
+    workarea_values;
   Display.set_window_property display root
     (Display.atom_net_client_list display)
     (Stack_set.all_windows state);
@@ -735,7 +757,7 @@ let run (config : Config.t) =
               docks := w :: !docks;
               Hashtbl.replace mapped_windows w ();
               Display.select_input display ~window:w
-                ~mask:Display.mask_enter_window;
+                ~mask:Display.mask_managed_window;
               log "Adopted existing dock: window=%d" w
             end else begin
               Hashtbl.replace mapped_windows w ();
@@ -757,6 +779,36 @@ let run (config : Config.t) =
           spawn_and_track entry.tag entry.cmd)
         config.startup;
 
+      (* Give status bars launched just before/with camlwm a short chance to
+         map and publish _NET_WM_STRUT[_PARTIAL] before the first client layout.
+         Without this first visible clients can be tiled against the full root
+         window, then corrected only after a later dock PropertyNotify. *)
+      let settle_until = Unix.gettimeofday () +. 0.25 in
+      let rec settle_startup () =
+        let now = Unix.gettimeofday () in
+        if now < settle_until then begin
+          if Display.pending display > 0 then begin
+            let event = Display.next_event display in
+            state :=
+              handle_event config display ~screen:(usable_screen ()) event !state;
+            settle_startup ()
+          end else begin
+            Unix.sleepf (min 0.01 (max 0.0 (settle_until -. now)));
+            settle_startup ()
+          end
+        end
+      in
+      settle_startup ();
+
+      let screen = usable_screen () in
+      reconcile_visibility display !state;
+      apply_layout config display ~full_screen:screen_detail ~screen !state;
+      update_borders config display !state;
+      (match Stack_set.peek !state with
+       | Some w -> Display.set_input_focus display w
+       | None -> Display.set_input_focus display root);
+      update_ewmh display root config ~workarea:screen !state;
+
       log "Entering event loop";
       let rec loop () =
         let event = Display.next_event display in
@@ -768,7 +820,7 @@ let run (config : Config.t) =
         (match Stack_set.peek !state with
          | Some w -> Display.set_input_focus display w
          | None -> Display.set_input_focus display root);
-        update_ewmh display root config !state;
+        update_ewmh display root config ~workarea:screen !state;
         loop ()
       in
       loop ()

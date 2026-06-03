@@ -137,13 +137,14 @@ camlwm/
   - `WM_TRANSIENT_FOR` (dialogs placed on parent workspace)
   - `WM_STATE` on managed/withdrawn windows
   - `PropertyNotify` and `ClientMessage` event handling
-  - `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`, `_NET_CLIENT_LIST`,
-    `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`, `_NET_SUPPORTED`
+  - `_NET_CURRENT_DESKTOP`, `_NET_WORKAREA`, `_NET_ACTIVE_WINDOW`,
+    `_NET_CLIENT_LIST`, `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`,
+    `_NET_SUPPORTED`
   - `_NET_CURRENT_DESKTOP` client messages (polybar click-to-switch)
 - Startup window scan via `XQueryTree` (adopt pre-existing docks/windows)
 - Dynamic strut detection via `PropertyNotify` (late-setting docks)
 - `workspace_bindings_mapped` (decouple tag names from key names)
-- Click-to-focus (`Button_press` passive grab)
+- Focus-follows-mouse (`EnterNotify`) and click-to-focus (`Button_press` passive grab)
 - Zombie child reaping (`SIGCHLD` handler)
 - Lock-modifier handling (NumLock/CapsLock combos on key grabs)
 

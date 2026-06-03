@@ -25,6 +25,7 @@ type t = {
   atom_net_number_of_desktops : Unsigned.ulong;
   atom_net_desktop_names : Unsigned.ulong;
   atom_net_current_desktop : Unsigned.ulong;
+  atom_net_workarea : Unsigned.ulong;
   atom_net_client_list : Unsigned.ulong;
   atom_net_active_window : Unsigned.ulong;
   atom_net_utf8_string : Unsigned.ulong;
@@ -74,6 +75,7 @@ let open_default () =
         atom_net_number_of_desktops = atom "_NET_NUMBER_OF_DESKTOPS";
         atom_net_desktop_names = atom "_NET_DESKTOP_NAMES";
         atom_net_current_desktop = atom "_NET_CURRENT_DESKTOP";
+        atom_net_workarea = atom "_NET_WORKAREA";
         atom_net_client_list = atom "_NET_CLIENT_LIST";
         atom_net_active_window = atom "_NET_ACTIVE_WINDOW";
         atom_net_utf8_string = atom "UTF8_STRING";
@@ -147,6 +149,7 @@ let atom_net_supporting_wm_check t = t.atom_net_supporting_wm_check
 let atom_net_number_of_desktops t = t.atom_net_number_of_desktops
 let atom_net_desktop_names t = t.atom_net_desktop_names
 let atom_net_current_desktop t = t.atom_net_current_desktop
+let atom_net_workarea t = t.atom_net_workarea
 let atom_net_client_list t = t.atom_net_client_list
 let atom_net_active_window t = t.atom_net_active_window
 let atom_net_wm_state t = t.atom_net_wm_state
@@ -238,8 +241,14 @@ let send_wm_delete t w =
   let set_int off v = from_voidp int (to_voidp (buf +@ off)) <-@ v in
   let set_ulong off v = from_voidp ulong (to_voidp (buf +@ off)) <-@ v in
   let set_long off v = from_voidp long (to_voidp (buf +@ off)) <-@ v in
+  let set_bool off v = from_voidp bool (to_voidp (buf +@ off)) <-@ v in
+  let set_display off v = from_voidp Ffi.display_t (to_voidp (buf +@ off)) <-@ v in
   set_int 0 33;
   (* ClientMessage *)
+  set_bool 16 true;
+  (* send_event *)
+  set_display 24 t.raw;
+  (* display *)
   set_ulong 32 (Unsigned.ULong.of_int w);
   (* window *)
   set_ulong 40 t.atom_wm_protocols;
@@ -260,8 +269,11 @@ let close_window t w =
     List.exists
       (fun a -> Unsigned.ULong.compare a t.atom_wm_delete_window = 0)
       protocols
-  then send_wm_delete t w
-  else kill_client t w
+  then send_wm_delete t w;
+  (* Some clients/toolkits ignore or delay WM_DELETE_WINDOW in nested sessions.
+     Make the user-visible close binding deterministic by forcing the client
+     after the polite request. *)
+  kill_client t w
 
 let send_configure_notify t ~window ~x ~y ~w ~h =
   let buf = allocate_n char ~count:Ffi.xevent_buf_size in
@@ -334,7 +346,8 @@ let grab_key t ~window ~keycode ~modifiers =
     (Ffi.x_grab_key t.raw keycode
        (Unsigned.UInt.of_int modifiers)
        (Unsigned.ULong.of_int window)
-       true (* owner_events *)
+       false (* owner_events: deliver WM keybindings to the grab window even
+                when a client owns keyboard focus. *)
        Ffi.Grab_mode.async Ffi.Grab_mode.async)
 
 let grab_button t ~window =

@@ -80,6 +80,16 @@ let () =
   in
   Unix.putenv "OCAMLPATH" new_path
 
+let ocamlfind_tool () =
+  match Sys.getenv_opt "CAMLWM_OCAMLFIND" with
+  | Some tool when String.trim tool <> "" -> tool
+  | _ ->
+      let exe = Sys.executable_name in
+      if Filename.is_relative exe then "ocamlfind"
+      else
+        let candidate = Filename.concat (Filename.dirname exe) "ocamlfind" in
+        if file_exists candidate then candidate else "ocamlfind"
+
 let read_process cmd =
   let ic = Unix.open_process_in cmd in
   let buf = Buffer.create 256 in
@@ -113,8 +123,8 @@ let dep_sort sources =
       let quoted = List.map Filename.quote helpers |> String.concat " " in
       let cmd =
         Printf.sprintf
-          "ocamlfind ocamldep -package camlwm.core -sort %s 2>&1"
-          quoted
+          "%s ocamldep -package camlwm.core -sort %s 2>&1"
+          (Filename.quote (ocamlfind_tool ())) quoted
       in
       let status, output = read_process cmd in
       (match status with
@@ -151,7 +161,8 @@ let compile sources =
       let files = List.map Filename.quote sorted |> String.concat " " in
       let cmd =
         Printf.sprintf
-          "ocamlfind ocamlopt -package camlwm.core,camlwm.wm,unix -linkpkg -I %s -I %s %s -o %s 2>&1"
+          "%s ocamlopt -package camlwm.core,camlwm.wm,unix -linkpkg -I %s -I %s %s -o %s 2>&1"
+          (Filename.quote (ocamlfind_tool ()))
           (Filename.quote config_dir)
           (Filename.quote build_dir) files
           (Filename.quote cached_binary)

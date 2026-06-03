@@ -82,8 +82,9 @@ DISPLAY=:10 camlwm
   - Dialogs/splash/utility auto-float, raised above tiled windows
   - `WM_STATE` set on managed/withdrawn windows
   - `PropertyNotify` and `ClientMessage` event handling
-  - `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`, `_NET_CLIENT_LIST`,
-    `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`, `_NET_SUPPORTED`
+  - `_NET_CURRENT_DESKTOP`, `_NET_WORKAREA`, `_NET_ACTIVE_WINDOW`,
+    `_NET_CLIENT_LIST`, `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`,
+    `_NET_SUPPORTED`
   - `_NET_CURRENT_DESKTOP` client messages (polybar click-to-switch)
 - **Startup window scan**: adopts pre-existing windows and docks via
   `XQueryTree` so status bars launched before the WM are respected
@@ -91,7 +92,7 @@ DISPLAY=:10 camlwm
   are picked up via `PropertyNotify`
 - **Mapped workspace bindings**: `workspace_bindings_mapped` decouples tag
   names from key names (e.g. tag "dev" bound to `Super+1`)
-- **Click-to-focus**: clicking a window focuses it (no focus-follows-mouse)
+- **Focus-follows-mouse and click-to-focus**: entering or clicking a window focuses it
 - **Lock-modifier handling**: keybindings work regardless of NumLock/CapsLock state
 - **Zombie reaping**: child processes cleaned up via `SIGCHLD` handler
 - **Quit action**: clean WM exit via keybinding
@@ -112,17 +113,14 @@ DISPLAY=:10 camlwm
 | Binding               | Action                             |
 | --------------------- | ---------------------------------- |
 | `Mod4+Return`         | Spawn terminal                     |
-| `Mod4+Space`          | App launcher                       |
-| `Mod4+e`              | Cycle layout                       |
-| `Mod4+j` / `Mod4+k`   | Focus next / previous window       |
-| `Mod4+h` / `Mod4+l`   | Shrink / expand master area        |
+| `Mod4+Space`          | Cycle layout                       |
+| `Mod4+h/j/k/l`        | Directional focus                  |
+| `Mod4+Shift+h/l`      | Shrink / expand master area        |
 | `Mod4+,` / `Mod4+.`   | Decrease / increase master count   |
 | `Mod4+1`...`9`        | View workspace                     |
 | `Mod4+Shift+1`...`9`  | Send window to workspace           |
-| `Mod4+Shift+Return`  | Swap focused with master           |
-| `Mod4+Shift+q`        | Close focused window               |
-| `Mod4+Shift+e`        | Quit                               |
-| `Mod4+Shift+r`        | Recompile config                   |
+| `Mod4+m`              | Swap focused with master           |
+| `Mod4+q`              | Close focused window               |
 
 ## Configuration
 
@@ -149,6 +147,9 @@ the WM falls back to defaults. Build artifacts go in
 `~/.config/camlwm/build/` to keep the config directory clean.
 
 Use `camlwm --recompile` to check your config without starting the WM.
+Set `CAMLWM_OCAMLFIND=/path/to/ocamlfind` if config recompilation needs an
+explicit OCaml toolchain; otherwise camlWM prefers an `ocamlfind` next to the
+installed `camlwm` binary before falling back to `PATH`.
 
 ### Multi-file configs
 
