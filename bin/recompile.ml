@@ -64,6 +64,22 @@ let any_source_newer sources =
   let bin_mtime = mtime cached_binary in
   List.exists (fun src -> mtime src > bin_mtime) sources
 
+(* Compute the library install path relative to the running binary.
+   If camlwm is at /home/ryan/.local/bin/camlwm, libs are at
+   /home/ryan/.local/lib/camlwm/. Prepend to OCAMLPATH so ocamlfind
+   can discover camlwm.core/camlwm.wm regardless of install method. *)
+let () =
+  let exe = Sys.executable_name in
+  let bin_dir = Filename.dirname exe in
+  let prefix = Filename.dirname bin_dir in
+  let lib_dir = Filename.concat prefix "lib" in
+  let current = match Sys.getenv_opt "OCAMLPATH" with Some p -> p | None -> "" in
+  let new_path =
+    if current = "" then lib_dir
+    else lib_dir ^ ":" ^ current
+  in
+  Unix.putenv "OCAMLPATH" new_path
+
 let read_process cmd =
   let ic = Unix.open_process_in cmd in
   let buf = Buffer.create 256 in
