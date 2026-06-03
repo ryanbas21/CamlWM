@@ -374,7 +374,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
   | Button_press { window } ->
       Display.allow_events display;
       Stack_set.focus_window window state
-  | Enter_notify { window } -> Stack_set.focus_window window state
+  | Enter_notify { window = _ } -> state
   | Map_request { window } ->
       let wtype = Display.read_window_type display window in
       (* Dock windows are not managed — just map and track struts *)
