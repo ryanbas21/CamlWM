@@ -51,3 +51,9 @@ val workspace_bindings :
   mod_key:int -> tags:string list -> bindings -> bindings
 (** [workspace_bindings ~mod_key ~tags bindings] adds View + Shift
     bindings for each tag. Derives from [tags] — no hardcoded list. *)
+
+val workspace_bindings_mapped :
+  mod_key:int -> (string * string) list -> bindings -> bindings
+(** [workspace_bindings_mapped ~mod_key pairs bindings] adds View + Shift
+    bindings from [(key_name, tag)] pairs. Use when tag names don't match
+    key names, e.g. [("1", "dev"); ("2", "web")]. *)

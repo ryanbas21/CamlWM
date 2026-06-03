@@ -181,6 +181,36 @@ let x_change_property =
 let x_send_event =
   foreign "XSendEvent"
     (display_t @-> window_t @-> bool @-> long @-> ptr char @-> returning int)
+(* ---------- Window tree query ---------- *)
+
+(* Status XQueryTree(Display *, Window, Window *root_return,
+                     Window *parent_return,
+                     Window **children_return,
+                     unsigned int *nchildren_return); *)
+let x_query_tree =
+  foreign "XQueryTree"
+    (display_t @-> window_t @-> ptr window_t @-> ptr window_t
+   @-> ptr (ptr window_t) @-> ptr uint @-> returning int)
+
+(* ---------- Window attributes ---------- *)
+
+(* We only need IsViewable (2) from XWindowAttributes.map_state.
+   XGetWindowAttributes fills a 112-byte struct; map_state is at a
+   known offset. Rather than model the entire struct, we bind
+   XGetWindowAttributes with a raw buffer and read the field. *)
+let x_get_window_attributes_buf_size = 136
+
+let x_get_window_attributes =
+  foreign "XGetWindowAttributes"
+    (display_t @-> window_t @-> ptr char @-> returning int)
+
+(* map_state offset in XWindowAttributes on 64-bit Linux:
+   x(4) + y(4) + width(4) + height(4) + border_width(4) + depth(4) +
+   visual*(8) + root(8) + class(4) + bit_gravity(4) + win_gravity(4) +
+   backing_store(4) + backing_planes(8) + backing_pixel(8) + save_under(4) +
+   pad(4) + colormap(8) + map_installed(4) + map_state(4) = offset 92 *)
+let xwa_map_state_offset = 92
+
 (* ---------- Keyboard ---------- *)
 
 (* KeyCode XKeysymToKeycode(Display *display, KeySym keysym); *)

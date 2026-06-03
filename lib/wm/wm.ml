@@ -521,17 +521,41 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
       match matching with
       | None -> state
       | Some action -> run_action config display ~screen action state)
-  | Property_notify { window = _; atom = _ } ->
-      state
+  | Property_notify { window; atom } ->
+      (* If a dock updates its strut after mapping, adopt it *)
+      let strut_atom =
+        Unsigned.ULong.to_int (Display.atom_net_wm_strut display)
+      in
+      let strut_partial_atom =
+        Unsigned.ULong.to_int (Display.atom_net_wm_strut_partial display)
+      in
+      if (atom = strut_atom || atom = strut_partial_atom)
+         && not (List.mem window !docks)
+         && Display.read_strut display window <> None
+      then (
+        docks := window :: !docks;
+        (* Remove from tiling if it was managed *)
+        Stack_set.delete window state)
+      else state
   | Client_message { window; message_type; data } ->
       let net_wm_state =
         Unsigned.ULong.to_int (Display.atom_net_wm_state display)
+      in
+      let net_current_desktop =
+        Unsigned.ULong.to_int (Display.atom_net_current_desktop display)
       in
       if message_type = net_wm_state then (
         match data with
         | action :: prop1 :: _ ->
             handle_wm_state_change config display window action prop1;
             state
+        | _ -> state)
+      else if message_type = net_current_desktop then (
+        match data with
+        | idx :: _ ->
+            (match List.nth_opt config.tags idx with
+             | Some tag -> Stack_set.view tag state
+             | None -> state)
         | _ -> state)
       else state
   | Other { event_type } ->
@@ -667,6 +691,30 @@ let run (config : Config.t) =
       in
 
       init_ewmh display root config;
+
+      (* Scan existing windows — adopt any that were mapped before we started.
+         This handles polybar/tint2 that launched from .xinitrc before the WM. *)
+      let existing = Display.query_tree display ~window:root in
+      List.iter
+        (fun w ->
+          if Display.is_viewable display ~window:w then begin
+            let wtype = Display.read_window_type display w in
+            if wtype = Dock || Display.read_strut display w <> None then begin
+              docks := w :: !docks;
+              Hashtbl.replace mapped_windows w ();
+              Display.select_input display ~window:w
+                ~mask:Display.mask_enter_window;
+              log "Adopted existing dock: window=%d" w
+            end else begin
+              Hashtbl.replace mapped_windows w ();
+              Display.select_input display ~window:w
+                ~mask:Display.mask_managed_window;
+              Display.grab_button display ~window:w;
+              state := Stack_set.insert_up w !state;
+              log "Adopted existing window: window=%d" w
+            end
+          end)
+        existing;
 
       (* Spawn startup entries and track their PIDs *)
       List.iter

@@ -59,3 +59,11 @@ let workspace_bindings ~mod_key ~tags bindings =
       |> bind mod_key tag (View tag)
       |> bind (mod_key lor shift) tag (Shift tag))
     bindings tags
+
+let workspace_bindings_mapped ~mod_key pairs bindings =
+  List.fold_left
+    (fun acc (key, tag) ->
+      acc
+      |> bind mod_key key (View tag)
+      |> bind (mod_key lor shift) key (Shift tag))
+    bindings pairs

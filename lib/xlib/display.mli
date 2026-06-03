@@ -149,6 +149,8 @@ val atom_net_wm_window_type_normal : t -> Unsigned.ULong.t
 val atom_wm_transient_for : t -> Unsigned.ULong.t
 val atom_wm_state : t -> Unsigned.ULong.t
 val atom_net_wm_name : t -> Unsigned.ULong.t
+val atom_net_wm_strut : t -> Unsigned.ULong.t
+val atom_net_wm_strut_partial : t -> Unsigned.ULong.t
 
 (** {1 Event masks} *)
 
@@ -199,3 +201,13 @@ val create_window :
 
 val set_input_focus : t -> window -> unit
 (** Set X11 keyboard input focus to [window] with RevertToPointerRoot. *)
+
+(** {1 Window tree} *)
+
+val query_tree : t -> window:window -> window list
+(** [query_tree display ~window] returns all child windows of [window].
+    Call on the root window at startup to discover pre-existing windows. *)
+
+val is_viewable : t -> window:window -> bool
+(** Returns [true] if [window] is currently mapped and viewable (not
+    withdrawn or iconic). Used during startup scan to skip unmapped windows. *)

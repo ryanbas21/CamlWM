@@ -40,6 +40,10 @@ let my_bindings =
          ("r", Spawn [ "sh"; "-c"; "camlwm --recompile" ]);
          ("x", Spawn Commands.lock_screen);
        ]
+  (* Map tags to number keys: Mod+1 → tag "1", Mod+2 → tag "2", etc.
+     For named tags like ["dev"; "web"; ...], use workspace_bindings_mapped:
+       |> Key_binding.workspace_bindings_mapped ~mod_key:m
+            (List.mapi (fun i tag -> (string_of_int (i + 1), tag)) tags) *)
   |> Key_binding.workspace_bindings ~mod_key:m ~tags
 
 let my_manage_hook =

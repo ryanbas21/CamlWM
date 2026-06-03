@@ -160,6 +160,8 @@ let atom_net_wm_window_type_normal t = t.atom_net_wm_window_type_normal
 let atom_wm_transient_for t = t.atom_wm_transient_for
 let atom_wm_state t = t.atom_wm_state
 let atom_net_wm_name t = t.atom_net_wm_name
+let atom_net_wm_strut t = t.atom_net_wm_strut
+let atom_net_wm_strut_partial t = t.atom_net_wm_strut_partial
 let mask_enter_window = Ffi.Event_mask.enter_window
 
 let mask_managed_window =
@@ -290,6 +292,36 @@ let move_resize t ~window ~x ~y ~w ~h =
     (Ffi.x_move_resize_window t.raw
        (Unsigned.ULong.of_int window)
        x y (Unsigned.UInt.of_int w) (Unsigned.UInt.of_int h))
+
+let query_tree t ~window : window list =
+  let root_ret = allocate Ffi.window_t (Unsigned.ULong.of_int 0) in
+  let parent_ret = allocate Ffi.window_t (Unsigned.ULong.of_int 0) in
+  let children_ret = allocate (ptr Ffi.window_t) (from_voidp Ffi.window_t null) in
+  let nchildren_ret = allocate uint (Unsigned.UInt.of_int 0) in
+  let status =
+    Ffi.x_query_tree t.raw (Unsigned.ULong.of_int window) root_ret parent_ret
+      children_ret nchildren_ret
+  in
+  if status = 0 then []
+  else
+    let n = Unsigned.UInt.to_int (!@nchildren_ret) in
+    let arr = !@children_ret in
+    let result = List.init n (fun i ->
+      Unsigned.ULong.to_int (!@(arr +@ i))) in
+    (if n > 0 then Ffi.x_free (to_voidp arr));
+    result
+
+let is_viewable t ~window : bool =
+  let buf = allocate_n char ~count:Ffi.x_get_window_attributes_buf_size in
+  let status =
+    Ffi.x_get_window_attributes t.raw (Unsigned.ULong.of_int window) buf
+  in
+  if status = 0 then false
+  else
+    let map_state =
+      !@(from_voidp int (to_voidp (buf +@ Ffi.xwa_map_state_offset)))
+    in
+    map_state = 2 (* IsViewable *)
 
 let keysym_of_string s = Unsigned.ULong.to_int (Ffi.x_string_to_keysym s)
 
