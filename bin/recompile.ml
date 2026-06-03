@@ -1,7 +1,7 @@
 (* Recompile the user's config and exec the result.
 
    All .ml and .mli files in ~/.config/camlwm/ are compiled together.
-   [ocamldep -sort] determines the correct compilation order.
+   [ocamlfind] resolves the camlwm libraries and their transitive deps.
 
    Flow:
      1. Look for ~/.config/camlwm/config.ml
@@ -10,7 +10,8 @@
      4. If stale or missing → compile with ocamlfind, write error.log on
         failure, delete error.log on success
      5. If compilation succeeded → exec the binary (replaces this process)
-     6. If compilation failed → return `Compile_error` (caller falls back) *)
+     6. If compilation failed and a stale cached binary exists → exec it
+     7. If no cached binary at all → return `Compile_error` (caller falls back) *)
 
 type result = No_user_config | Exec_failed of string | Compile_error of string
 
