@@ -84,7 +84,14 @@ DISPLAY=:10 camlwm
   - `PropertyNotify` and `ClientMessage` event handling
   - `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`, `_NET_CLIENT_LIST`,
     `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`, `_NET_SUPPORTED`
-- **Focus follows mouse**: moving the pointer into a window focuses it
+  - `_NET_CURRENT_DESKTOP` client messages (polybar click-to-switch)
+- **Startup window scan**: adopts pre-existing windows and docks via
+  `XQueryTree` so status bars launched before the WM are respected
+- **Dynamic strut detection**: docks that set `_NET_WM_STRUT` after mapping
+  are picked up via `PropertyNotify`
+- **Mapped workspace bindings**: `workspace_bindings_mapped` decouples tag
+  names from key names (e.g. tag "dev" bound to `Super+1`)
+- **Click-to-focus**: clicking a window focuses it (no focus-follows-mouse)
 - **Lock-modifier handling**: keybindings work regardless of NumLock/CapsLock state
 - **Zombie reaping**: child processes cleaned up via `SIGCHLD` handler
 - **Quit action**: clean WM exit via keybinding
@@ -92,9 +99,11 @@ DISPLAY=:10 camlwm
 ## Missing / planned
 
 - Mouse bindings (drag to move/resize floating windows)
-- Multi-monitor
+- Multi-monitor (Xinerama / XRandR)
 - Restart-in-place (config recompile loses window state)
+- `_NET_ACTIVE_WINDOW` client messages (cross-workspace activation)
 - `WM_TAKE_FOCUS` (globally-active-input clients like Java AWT)
+- More layouts (Mirror, Spiral, Tabbed)
 
 ## Keybindings
 
@@ -102,15 +111,18 @@ DISPLAY=:10 camlwm
 
 | Binding               | Action                             |
 | --------------------- | ---------------------------------- |
-| `Mod4+Return`         | Spawn xterm                        |
-| `Mod4+h/j/k/l`       | Focus left / down / up / right     |
-| `Mod4+m`              | Swap focused with master           |
-| `Mod4+Space`          | Cycle layout                       |
-| `Mod4+q`              | Close focused window               |
-| `Mod4+Shift+h/l`      | Shrink / expand master area        |
+| `Mod4+Return`         | Spawn terminal                     |
+| `Mod4+Space`          | App launcher                       |
+| `Mod4+e`              | Cycle layout                       |
+| `Mod4+j` / `Mod4+k`   | Focus next / previous window       |
+| `Mod4+h` / `Mod4+l`   | Shrink / expand master area        |
 | `Mod4+,` / `Mod4+.`   | Decrease / increase master count   |
 | `Mod4+1`...`9`        | View workspace                     |
 | `Mod4+Shift+1`...`9`  | Send window to workspace           |
+| `Mod4+Shift+Return`  | Swap focused with master           |
+| `Mod4+Shift+q`        | Close focused window               |
+| `Mod4+Shift+e`        | Quit                               |
+| `Mod4+Shift+r`        | Recompile config                   |
 
 ## Configuration
 
@@ -215,14 +227,26 @@ a map that already has `super+Return -> xterm` replaces it. No
 silent first-match shadowing.
 
 **`Key_binding.workspace_bindings`** derives View + Shift bindings from
-your actual `tags` — no hardcoded list:
+your actual `tags` — no hardcoded list. Works when tag names match key
+names (e.g. `"1"`, `"2"`, ...):
 
 ```ocaml
-(* Use Alt for workspace switching with custom tags *)
 Key_binding.empty
 |> Key_binding.workspace_bindings
-     ~mod_key:Key_binding.alt
-     ~tags:[ "web"; "dev"; "chat" ]
+     ~mod_key:Key_binding.super
+     ~tags:[ "1"; "2"; "3"; "4"; "5" ]
+```
+
+**`Key_binding.workspace_bindings_mapped`** decouples tag names from key
+names — use when tags have descriptive names:
+
+```ocaml
+let tags = [ "dev"; "web"; "chat"; "4"; "5" ]
+
+Key_binding.empty
+|> Key_binding.workspace_bindings_mapped ~mod_key:Key_binding.super
+     (List.mapi (fun i tag -> (string_of_int (i + 1), tag)) tags)
+(* Super+1 → "dev", Super+2 → "web", Super+3 → "chat", ... *)
 ```
 
 ### Startup programs

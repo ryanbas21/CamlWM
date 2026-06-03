@@ -128,7 +128,7 @@ camlwm/
   via `ocamldep`; build artifacts in `build/` subdirectory)
 - `Camlwm_wm.run` (re-exported, no more `Camlwm_wm.Wm.run`)
 - Keybinding helpers in `Key_binding` module (`with_mod`, `bind`,
-  `bind_all`, `workspace_bindings_for`, `super`, `alt`)
+  `workspace_bindings`, `workspace_bindings_mapped`, `super`, `alt`)
 - Strut support (`_NET_WM_STRUT_PARTIAL` for status bars)
 - EWMH/ICCCM compliance:
   - `_NET_SUPPORTING_WM_CHECK` (panels recognise the WM)
@@ -139,15 +139,19 @@ camlwm/
   - `PropertyNotify` and `ClientMessage` event handling
   - `_NET_CURRENT_DESKTOP`, `_NET_ACTIVE_WINDOW`, `_NET_CLIENT_LIST`,
     `_NET_DESKTOP_NAMES`, `_NET_NUMBER_OF_DESKTOPS`, `_NET_SUPPORTED`
-- Focus follows mouse (`Enter_notify`)
+  - `_NET_CURRENT_DESKTOP` client messages (polybar click-to-switch)
+- Startup window scan via `XQueryTree` (adopt pre-existing docks/windows)
+- Dynamic strut detection via `PropertyNotify` (late-setting docks)
+- `workspace_bindings_mapped` (decouple tag names from key names)
+- Click-to-focus (`Button_press` passive grab)
 - Zombie child reaping (`SIGCHLD` handler)
 - Lock-modifier handling (NumLock/CapsLock combos on key grabs)
 
-**Phase 5 -- floating & EWMH polish**
-- Wire up the existing `Config.Float` / `Stack_set.floating` path
-- Auto-float windows by `_NET_WM_WINDOW_TYPE` (dialog, splash, utility)
+**Phase 5 -- EWMH polish**
 - Set `_NET_WM_DESKTOP` per window
+- Handle `_NET_ACTIVE_WINDOW` client messages (cross-workspace activation)
 - Handle `_NET_WM_STATE` changes (maximized, demands-attention)
+- `_NET_CLIENT_LIST_STACKING` (z-order for pagers)
 
 **Phase 6 -- mouse bindings**
 - Decode `ButtonPress` / `ButtonRelease` / `MotionNotify`
@@ -165,7 +169,7 @@ camlwm/
 - More layouts (Mirror combinator, Spiral, Tabbed)
 - Urgency hints (parse `WM_HINTS` urgency bit, visual indicator)
 - Focus stealing prevention (`_NET_WM_USER_TIME`)
-- `_NET_CLIENT_LIST_STACKING` (z-order for pagers)
+- `WM_TAKE_FOCUS` (globally-active-input clients like Java AWT)
 
 ## Note
 
