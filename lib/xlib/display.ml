@@ -305,6 +305,26 @@ let grab_key t ~window ~keycode ~modifiers =
        true (* owner_events *)
        Ffi.Grab_mode.async Ffi.Grab_mode.async)
 
+let grab_button t ~window =
+  ignore
+    (Ffi.x_grab_button t.raw
+       (Unsigned.UInt.of_int Ffi.any_button)
+       (Unsigned.UInt.of_int Ffi.any_modifier)
+       (Unsigned.ULong.of_int window)
+       true (* owner_events *)
+       (Unsigned.UInt.of_int
+          (Int64.to_int Ffi.Event_mask.button_press))
+       Ffi.Grab_mode.sync
+       Ffi.Grab_mode.async
+       (Unsigned.ULong.of_int 0) (* confine_to = None *)
+       (Unsigned.ULong.of_int 0) (* cursor = None *))
+
+let allow_events t =
+  ignore
+    (Ffi.x_allow_events t.raw
+       Ffi.Allow_events.replay_pointer
+       (Signed.Long.of_int 0) (* CurrentTime *))
+
 (* The error handler is a C function pointer. We MUST keep the OCaml
    closure alive for as long as Xlib might call it — store it in a ref
    so the GC doesn't collect the funptr trampoline. *)
@@ -348,18 +368,17 @@ let set_input_focus t window =
        1 (* RevertToPointerRoot *)
        (Signed.Long.of_int 0) (* CurrentTime *))
 
-(* ---------- Properties (CARDINAL arrays) ----------
+(* ---------- Properties (format-32 arrays) ----------
 
    Reading X11 properties via [XGetWindowProperty] is unwieldy: 6 output
    ptrs, a returned [unsigned char *] that for format=32 is actually a
    [long *] (an Xlib quirk on 64-bit Linux — 32-bit-on-the-wire becomes
    64-bit-in-memory), and a manual XFree of the result.
 
-   [read_cardinal_property] hides all that and returns a clean [int list option]
-   for the common case of "read up to N 32-bit CARDINALs into an OCaml list".
-   None means "property is absent or wrong type". *)
+   [read_property_longs] generalises the read for any format=32 type
+   (CARDINAL, ATOM, WINDOW). None means "property is absent or wrong type". *)
 
-let read_cardinal_property t window atom ~max_count : int list option =
+let read_property_longs t window atom ~expected_type ~max_count : int list option =
   let actual_type = allocate Ffi.atom_t (Unsigned.ULong.of_int 0) in
   let actual_format = allocate int 0 in
   let nitems = allocate ulong (Unsigned.ULong.of_int 0) in
@@ -370,19 +389,17 @@ let read_cardinal_property t window atom ~max_count : int list option =
       (Unsigned.ULong.of_int window)
       atom (Signed.Long.of_int 0)
       (Signed.Long.of_int max_count)
-      false Ffi.atom_cardinal actual_type actual_format nitems bytes_after prop
+      false expected_type actual_type actual_format nitems bytes_after prop
   in
   let n = Unsigned.ULong.to_int !@nitems in
   let format = !@actual_format in
   let returned_type = !@actual_type in
-  (* "None" type (Unsigned.ULong 0) means the property wasn't set. *)
-  let type_ok = Unsigned.ULong.compare returned_type Ffi.atom_cardinal = 0 in
+  let type_ok = Unsigned.ULong.compare returned_type expected_type = 0 in
   if (not type_ok) || n = 0 || format <> 32 then begin
     if not (is_null !@prop) then Ffi.x_free (to_voidp !@prop);
     None
   end
   else begin
-    (* Read [n] longs (8 bytes each on x86_64) out of the returned buffer. *)
     let p = !@prop in
     let longs =
       List.init n (fun i ->
@@ -392,6 +409,12 @@ let read_cardinal_property t window atom ~max_count : int list option =
     Ffi.x_free (to_voidp p);
     Some longs
   end
+
+let read_cardinal_property t window atom ~max_count =
+  read_property_longs t window atom ~expected_type:Ffi.atom_cardinal ~max_count
+
+let read_atom_property t window atom ~max_count =
+  read_property_longs t window atom ~expected_type:Ffi.atom_atom ~max_count
 
 (* Read a window's strut declaration, preferring the newer
    _NET_WM_STRUT_PARTIAL (12 cardinals; we use only the first 4)
@@ -493,7 +516,7 @@ type window_type = Dock | Dialog | Splash | Utility | Normal
 
 let read_window_type t window : window_type =
   let atom_prop = t.atom_net_wm_window_type in
-  match read_cardinal_property t window atom_prop ~max_count:8 with
+  match read_atom_property t window atom_prop ~max_count:8 with
   | None -> Normal
   | Some atoms ->
       let find_type a =
@@ -513,7 +536,7 @@ let read_window_type t window : window_type =
        | None -> Normal)
 
 let read_net_wm_state t window : int list =
-  match read_cardinal_property t window t.atom_net_wm_state ~max_count:16 with
+  match read_atom_property t window t.atom_net_wm_state ~max_count:16 with
   | Some atoms -> atoms
   | None -> []
 

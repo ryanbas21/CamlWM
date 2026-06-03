@@ -26,6 +26,7 @@ type t =
   | Destroy_notify of { window : window }
   | Configure_request of configure_request
   | Key_press of key_press
+  | Button_press of { window : window }
   | Enter_notify of { window : window }
   | Property_notify of { window : window; atom : int }
   | Client_message of { window : window; message_type : int; data : int list }

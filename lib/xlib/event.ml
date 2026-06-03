@@ -25,6 +25,7 @@ type t =
   | Destroy_notify of { window : window }
   | Configure_request of configure_request
   | Key_press of key_press
+  | Button_press of { window : window }
   | Enter_notify of { window : window }
   | Property_notify of { window : window; atom : int }
   | Client_message of { window : window; message_type : int; data : int list }
@@ -121,6 +122,8 @@ let decode (buf : char ptr) : t =
         keycode = read_uint_at buf Offset.key_keycode;
         state = read_uint_at buf Offset.key_state;
       }
+  else if et = Ffi.Event_type.button_press then
+    Button_press { window = read_window_at buf Offset.key_window }
   else if et = Ffi.Event_type.enter_notify then
     Enter_notify { window = read_window_at buf Offset.key_window }
   else if et = Ffi.Event_type.property_notify then

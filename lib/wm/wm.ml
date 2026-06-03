@@ -371,6 +371,9 @@ let apply_layout config display ~full_screen ~screen
 let handle_event (config : Config.t) display ~screen (event : Event.t)
     (state : Layout.t Stack_set.t) : Layout.t Stack_set.t =
   match event with
+  | Button_press { window } ->
+      Display.allow_events display;
+      Stack_set.focus_window window state
   | Enter_notify { window } -> Stack_set.focus_window window state
   | Map_request { window } ->
       let wtype = Display.read_window_type display window in
@@ -465,6 +468,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
             set_fullscreen display window;
           Display.select_input display ~window
             ~mask:Display.mask_managed_window;
+          Display.grab_button display ~window;
           if should_float then Display.raise_window display window;
           state'
   | Unmap_notify { window } ->

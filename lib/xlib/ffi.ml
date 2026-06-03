@@ -199,6 +199,22 @@ let x_grab_key =
     (display_t @-> int @-> uint @-> window_t @-> bool @-> int @-> int
    @-> returning int)
 
+(* ---------- Button grabs ---------- *)
+
+(* int XGrabButton(Display *, unsigned int button, unsigned int modifiers,
+                    Window grab_window, Bool owner_events,
+                    unsigned int event_mask,
+                    int pointer_mode, int keyboard_mode,
+                    Window confine_to, Cursor cursor); *)
+let x_grab_button =
+  foreign "XGrabButton"
+    (display_t @-> uint @-> uint @-> window_t @-> bool @-> uint @-> int @-> int
+   @-> window_t @-> ulong @-> returning int)
+
+(* int XAllowEvents(Display *, int event_mode, Time time); *)
+let x_allow_events =
+  foreign "XAllowEvents" (display_t @-> int @-> long @-> returning int)
+
 (* ---------- Error handler ---------- *)
 
 (* int (*XErrorHandler)(Display *, XErrorEvent *) — set via
@@ -260,6 +276,15 @@ module Grab_mode = struct
   let sync = 0
   let async = 1
 end
+
+(* XAllowEvents modes *)
+module Allow_events = struct
+  let replay_pointer = 2
+end
+
+(* XGrabButton wildcards *)
+let any_button = 0
+let any_modifier = 1 lsl 15 (* (1 << 15), X.h: AnyModifier *)
 
 (* ---------- XEvent layout offsets ---------- *)
 (* The XEvent union starts with a common header. We only read enough

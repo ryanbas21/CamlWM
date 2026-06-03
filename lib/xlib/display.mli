@@ -170,6 +170,16 @@ val grab_key : t -> window:window -> keycode:int -> modifiers:int -> unit
     [window], regardless of which window has the keyboard focus. Required for
     global WM keybindings. *)
 
+val grab_button : t -> window:window -> unit
+(** Passive grab on any button/modifier on [window] in sync mode. The WM
+    receives ButtonPress, can focus the window, then replays the click to the
+    application with [allow_events]. *)
+
+val allow_events : t -> unit
+(** [XAllowEvents(ReplayPointer, CurrentTime)] — replays a frozen pointer
+    event so the clicked-on application receives it. Call after handling a
+    sync-grabbed ButtonPress. *)
+
 (** {1 Error handling} *)
 
 val install_error_handler : on_error:(event_type:int -> unit) -> unit
