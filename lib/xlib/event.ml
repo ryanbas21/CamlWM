@@ -21,6 +21,7 @@ type configure_request = {
 
 type t =
   | Map_request of { window : window }
+  | Map_notify of { window : window; override_redirect : bool }
   | Unmap_notify of { window : window }
   | Destroy_notify of { window : window }
   | Configure_request of configure_request
@@ -89,6 +90,11 @@ module Offset = struct
   let prop_window = 32
   let prop_atom = 40
 
+  (* XMapEvent:
+       event at 32, window at 40, override_redirect at 48 (Bool = int) *)
+  let map_window = 40
+  let map_override_redirect = 48
+
   (* XClientMessageEvent:
        window at 32, message_type at 40, format at 48, data.l at 56 *)
   let cm_window = 32
@@ -101,6 +107,11 @@ let decode (buf : char ptr) : t =
   let et = read_int_at buf Offset.event_type in
   if et = Ffi.Event_type.map_request then
     Map_request { window = read_window_at buf Offset.request_window }
+  else if et = Ffi.Event_type.map_notify then
+    Map_notify {
+      window = read_window_at buf Offset.map_window;
+      override_redirect = read_int_at buf Offset.map_override_redirect <> 0;
+    }
   else if et = Ffi.Event_type.unmap_notify then
     Unmap_notify { window = read_window_at buf Offset.notify_window }
   else if et = Ffi.Event_type.destroy_notify then

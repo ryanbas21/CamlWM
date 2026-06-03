@@ -22,6 +22,7 @@ type configure_request = {
 
 type t =
   | Map_request of { window : window }
+  | Map_notify of { window : window; override_redirect : bool }
   | Unmap_notify of { window : window }
   | Destroy_notify of { window : window }
   | Configure_request of configure_request

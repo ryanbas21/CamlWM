@@ -375,6 +375,19 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
       Display.allow_events display;
       Stack_set.focus_window window state
   | Enter_notify { window = _ } -> state
+  | Map_notify { window; override_redirect } ->
+      (* Override-redirect windows (e.g. polybar) bypass MapRequest.
+         Detect docks here so their struts are respected. *)
+      if override_redirect && not (List.mem window !docks) then begin
+        let wtype = Display.read_window_type display window in
+        let strut = Display.read_strut display window in
+        if wtype = Dock || strut <> None then begin
+          docks := window :: !docks;
+          Hashtbl.replace mapped_windows window ();
+          log "Dock mapped via MapNotify (override_redirect): window=%d" window
+        end
+      end;
+      state
   | Map_request { window } ->
       let wtype = Display.read_window_type display window in
       (* Dock windows are not managed — just map and track struts *)
@@ -383,6 +396,7 @@ let handle_event (config : Config.t) display ~screen (event : Event.t)
         Display.map_window display window;
         Hashtbl.replace mapped_windows window ();
         Display.select_input display ~window ~mask:Display.mask_enter_window;
+        log "Registered dock: window=%d" window;
         state
       end
       else
