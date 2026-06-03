@@ -40,6 +40,7 @@ jobs:
             -v "$PWD/aur-repo:/pkg" \
             archlinux:base-devel \
             bash -lc 'useradd -m builder && chown -R builder:builder /pkg && su builder -c "cd /pkg && makepkg --printsrcinfo > .SRCINFO"'
+          sudo chown -R "$(id -u):$(id -g)" aur-repo
 
       - name: Push to AUR
         run: |
