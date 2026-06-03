@@ -161,7 +161,7 @@ let compile sources =
       let files = List.map Filename.quote sorted |> String.concat " " in
       let cmd =
         Printf.sprintf
-          "%s ocamlopt -package camlwm.core,camlwm.wm,unix -linkpkg -I %s -I %s %s -o %s 2>&1"
+          "%s ocamlopt -package camlwm.core,camlwm.wm,unix -linkpkg -cclib -lX11 -I %s -I %s %s -o %s 2>&1"
           (Filename.quote (ocamlfind_tool ()))
           (Filename.quote config_dir)
           (Filename.quote build_dir) files
